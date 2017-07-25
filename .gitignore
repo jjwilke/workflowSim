@@ -1,0 +1,2 @@
+# Ignore OSX directory specifics
+.DS_Store
