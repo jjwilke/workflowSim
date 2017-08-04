@@ -1,0 +1,7 @@
+#! /usr/bin/env bash
+
+echo cleaning...
+cd pintools/
+make clean
+cd ..
+make clean

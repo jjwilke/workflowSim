@@ -1,9 +1,8 @@
-PROGRAM_NAME = pinForkSim
-BOOST_ROOT = /usr/local/boost_1_59_0
+PROGRAM_NAME = mmapPinSim
 
 CC := g++
 
-INCLUDES := -I$(BOOST_ROOT)/include
+INCLUDES := 
 CXXFLAGS :=
 CPPFLAGS :=
 CFLAGS :=

@@ -1,10 +1,10 @@
-PIN_ROOT = $(HOME)/Desktop/pin/pin-3.2-81205-clang-mac
-BOOST_ROOT = /usr/local/boost_1_59_0
+PIN_ROOT = $(HOME)/install/pin-3.2-81205-clang-mac
+BOOST_ROOT = $(HOME)/install/boost-1.59.0
 PROG_ROOT = $(HOME)/Desktop/workflowProject
 
 PINTOOL_NAME = traceTest
 
-CC := g++
+CC := clang
 
 INCLUDES := \
   -I$(PIN_ROOT)/source/include/pin \
@@ -12,6 +12,7 @@ INCLUDES := \
   -I$(PIN_ROOT)/extras/components/include \
   -I$(PIN_ROOT)/extras/xed-intel64/include/xed \
   -I$(PIN_ROOT)/source/tools/InstLib \
+  -I$(PIN_ROOT)/extras/crt/include \
   -I$(BOOST_ROOT)/include
 
 CPPFLAGS := \
@@ -52,8 +53,8 @@ LIBS := \
   -lblas \
   -llapack\
   -lxed \
-  -lpin3dwarf \
   -nostdlib \
+  -lpin3dwarf \
   -lstlport-dynamic \
   -lm-dynamic \
   -lc-dynamic \

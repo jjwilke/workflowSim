@@ -1,0 +1,7 @@
+#! /usr/bin/env bash
+
+echo making...
+cd pintools/
+make
+cd ..
+make

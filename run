@@ -1,8 +1,4 @@
 #! /usr/bin/env bash
 
-echo Running simulation...
-cd pintools/
-make
-cd ..
-make
-./bin/pinForkSim
+echo running...
+./bin/mmapPinSim

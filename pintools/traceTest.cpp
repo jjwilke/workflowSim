@@ -1,33 +1,84 @@
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <unistd.h>
+#include <fcntl.h>
 #include <queue>
 #include <pin.H>
 #include <string>
 #include <cstdlib>
 #include <iostream>
-//#include <boost/interprocess/containers/vector.hpp>
-//#include <boost/interprocess/managed_shared_memory.hpp>
-//#include <boost/interprocess/allocators/allocator.hpp>
 
-//using namespace boost::interprocess;
-
-//Shm typedefs
-//typedef boost::interprocess::allocator<intptr_t, boost::interprocess::managed_shared_memory::segment_manager> shmemAllocator;
-//typedef boost::interprocess::vector<intptr_t, shmemAllocator> shmVector;
 
 //Globals
 std::queue<intptr_t> traceStorage;
 
 //Additional Functions
-void printVector(std::vector<intptr_t> &src)
-{
-	for (int i = 0; i < src.size(); i++)
-	{
-		std::cout << "[" << i << "]: " << src[i] << std::endl;
-	}
+bool mmapInit(char *filePath, struct stat &memBuf, void *map, int &fd)
+{        
+        printf("File: %s\n", filePath);    
+        fd = open(filePath, O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
+             
+        if (fd == -1)
+        {
+                perror("File did not *open* properly");
+                return false;  
+        }
+        if (stat(filePath, &memBuf) == -1)
+        {
+                perror("File status error (fstat)");
+                return false;
+        }
+        
+        map = mmap(NULL, memBuf.st_size, PROT_WRITE, MAP_SHARED, fd, 0);
+        if (map == MAP_FAILED)
+        {
+                perror("mmap failed to open");
+                return false;
+        }
+
+        return true;
 }
 
+bool mmapClose(void *map, int &fd, struct stat &buf)
+{
+        if (munmap(map, buf.st_size) == -1)
+        {
+                perror("munmap failed");
+                return false;
+        }      
+	if (close(fd) == -1)
+	{
+		perror("file did not close");
+		return false;
+	}
+
+        return true;
+}
+
+void exportTrace()
+{
+	//Init mmap
+	int pinfd;
+	char *pinMap;
+	struct stat memBuf;
+	char path[] = "/Users/gvanmou/Desktop/workflowProject/bin/mmapPin.out";
+	
+	mmapInit(path, memBuf, pinMap, pinfd);
+	
+	for (int i = 0; i < traceStorage.size(); i++)
+	{
+		write(pinfd, &traceStorage.front(), sizeof(intptr_t));
+		traceStorage.pop();
+	}
+	
+	mmapClose(pinMap, pinfd, memBuf);
+}
+
+
 //Pintool
-void printMemRead(void *addr)
+void recordMemRD(void *addr)
 {
 	intptr_t temp = (intptr_t)addr;
 	traceStorage.push(temp);
@@ -35,7 +86,7 @@ void printMemRead(void *addr)
 }
 
 
-void printMemWrite(void *addr)
+void recordMemWR(void *addr)
 {
 	intptr_t temp = (intptr_t)addr;
 	traceStorage.push(temp);
@@ -52,13 +103,13 @@ void Instruction( INS ins, void *v )
 		if (INS_MemoryOperandIsRead(ins, memOp))
 		{
 			INS_InsertPredicatedCall ( 
-				ins, IPOINT_BEFORE, (AFUNPTR)printMemRead,
+				ins, IPOINT_BEFORE, (AFUNPTR)recordMemRD,
 				IARG_MEMORYOP_EA, memOp, IARG_END);
 		}
 		if (INS_MemoryOperandIsWritten(ins, memOp))
 		{
 			INS_InsertPredicatedCall (
-				ins, IPOINT_BEFORE, (AFUNPTR)printMemWrite,
+				ins, IPOINT_BEFORE, (AFUNPTR)recordMemWR,
 				IARG_MEMORYOP_EA, memOp, IARG_END);
 		}
 	}
@@ -67,18 +118,8 @@ void Instruction( INS ins, void *v )
 
 void Fini( INT32 code, void *v )
 {
-	// Move to shared memory for parent access *new function*
-	//Open shm
-	std::vector<intptr_t> pinShm;
-	//boost::interprocess::managed_shared_memory pinSegment(boost::interprocess::open_only, "PinShm");
-	//shmVector *pinShmVector = pinSegment.find<shmVector>("pinShmVector").first;
-
-	for (int i = 0; i < traceStorage.size(); i++)
-	{
-		pinShm.push_back( traceStorage.front() );
-		traceStorage.pop();
-	}
-	printVector(pinShm);
+	//Output collected trace to mmap
+	//exportTrace();
 }
 
 
