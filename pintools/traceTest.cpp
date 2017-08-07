@@ -1,3 +1,4 @@
+#include <pthread.h>
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -88,7 +89,7 @@ void exportTrace()
 	
 	mmapInit(path, totalSize, pinMap, pinfd);
 	
-	printf("writing to file of length '%ld' bytes...\n", traceLen);
+	printf("writing trace of length '%ld' values...\n", traceLen);
 	printf("Page size = '%d' bytes...\n", PAGE_SIZE);
 	for (size_t i = 0; i < traceLen; i++)
 	{
