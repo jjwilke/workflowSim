@@ -32,7 +32,7 @@ int main (int argc, char** argv)
 	std::string progCall = "bin/" + progToTrace;
 		
 
-	// Pin call. Shm initialized within.
+	// Pin call
 	int my_argc = 5;
 	const char *programCall[100] = {pinCall.c_str(), pinOptions.c_str(), 
 					pintoolCall.c_str(), "--", progCall.c_str(), 
@@ -40,13 +40,25 @@ int main (int argc, char** argv)
 	bool callSuccess = exeProg(my_argc, programCall);		
 	if (callSuccess)
 	{
+		//-----------------------
 		//collect trace from mmap
+		//-----------------------
 		
 	
+		//-----------------------
 		//print collected trace data
-		//printVector(traceData);
+		//-----------------------
+		
 
+		//-----------------------
+		//printVector(traceData);
+		//-----------------------
+
+
+		//-----------------------
 		//cache sim
+		//-----------------------
+		
 	}
 	
 	return 0;

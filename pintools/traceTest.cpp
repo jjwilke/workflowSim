@@ -38,12 +38,12 @@ bool mmapInit(char *filePath, size_t fileSize, intptr_t *&map, int &fd)
                 perror("File did not *open* properly");
                 return false;  
         }
-        //if (lseek(fd, fileSize, SEEK_SET) == -1)
-        //{
-        //        perror("Unable to appropriately size the file");
-        //        return false;
-        //}
-	//write(fd, "", 1); //needed to set the size
+        if (lseek(fd, fileSize, SEEK_SET) == -1)
+        {
+                perror("Unable to appropriately size the file");
+                return false;
+        }
+	write(fd, "", 1); //needed to set the size
        
 	printf("File size is...%lu bytes\n", fileSize); 
         map = (intptr_t *)mmap(NULL, fileSize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
@@ -93,7 +93,6 @@ void exportTrace()
 	printf("Page size = '%d' bytes...\n", PAGE_SIZE);
 	for (size_t i = 0; i < traceLen; i++)
 	{
-		//printf("    Trace Size = %ld\n", sizeof(traceStorage.front()));
 		printf("Before pinMap[%lu] = %lld\n", i, pinMap[i]);
 		pinMap[i] = traceStorage.front();
 		printf("After  pinMap[%lu] = %lld\n", i, pinMap[i]);
@@ -115,16 +114,14 @@ void exportTrace()
 //Pintool
 void recordMemRD(void *addr)
 {
-	intptr_t temp = (intptr_t)addr;
-	traceStorage.push(temp);
+	traceStorage.push((intptr_t)addr);
 	//fprintf(trace, "%p\n", addr);
 }
 
 
 void recordMemWR(void *addr)
 {
-	intptr_t temp = (intptr_t)addr;
-	traceStorage.push(temp);
+	traceStorage.push((intptr_t)addr);
 	//fprintf(trace, "%p\n", addr);
 }
 
@@ -172,3 +169,4 @@ int main( int argc, char *argv[] )
 
 	return 0;
 }
+
