@@ -80,7 +80,6 @@ void exportTrace()
 
 	//Init mmap
 	int pinfd;
-	char *fileMem;
 	intptr_t *pinMap;
 	size_t traceLen = traceStorage.size();
 	size_t fileSize = traceLen * SIZE;
@@ -93,9 +92,9 @@ void exportTrace()
 	printf("Page size = '%d' bytes...\n", PAGE_SIZE);
 	for (size_t i = 0; i < traceLen; i++)
 	{
-		printf("Before pinMap[%lu] = %lld\n", i, pinMap[i]);
+		//printf("Before pinMap[%lu] = %lld\n", i, pinMap[i]);
 		pinMap[i] = traceStorage.front();
-		printf("After  pinMap[%lu] = %lld\n", i, pinMap[i]);
+		//printf("After  pinMap[%lu] = %lld\n", i, pinMap[i]);
 
 		traceStorage.pop();
 	}

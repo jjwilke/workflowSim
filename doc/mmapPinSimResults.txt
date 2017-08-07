@@ -1,0 +1,13 @@
+(Normal PIN Run)
+Direct Mapping Simulation Results:
+          Cache Size(KiB) = 64
+		      Hits = 648206
+	            Misses = 119702
+	    Hit/Miss Ratio = 5.4152
+
+(MMAP Workflow)
+Direct Mapping Simulation Results:
+          Cache Size(KiB) = 64
+                     Hits = 641971
+                   Misses = 115789
+           Hit/Miss Ratio = 5.5443
