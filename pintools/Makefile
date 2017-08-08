@@ -1,5 +1,5 @@
 PIN_ROOT = $(HOME)/install/pin-3.2-81205-clang-mac
-BOOST_ROOT = $(HOME)/install/boost-1.59.0
+SST_CORE = $(HOME)/install/sstcore-7.1.0
 PROG_ROOT = $(HOME)/Desktop/workflowProject
 
 PINTOOL_NAME = traceTest
@@ -13,7 +13,8 @@ INCLUDES := \
   -I$(PIN_ROOT)/extras/xed-intel64/include/xed \
   -I$(PIN_ROOT)/source/tools/InstLib \
   -I$(PIN_ROOT)/extras/crt/include \
-  -I$(BOOST_ROOT)/include
+  -I$(SST_CORE)/include/sst/core/interprocess \
+  -I$(PROG_ROOT)/pintools/include
 
 CPPFLAGS := \
   -isystem $(PIN_ROOT)/extras/stlport/include \
