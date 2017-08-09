@@ -12,43 +12,34 @@
 #include <iostream>
 #include <sstmutex.h>
 #include <myCircularBuffer.h>
+#include <macros.h>
 
 using namespace SST::Core::Interprocess;
 
-//Macros
-#ifndef TRACE_TYPE
-  #define TRACE_TYPE intptr_t
-#endif
-
-#ifdef TRACE_TYPE
-  #define BUFFER CircularBuffer<TRACE_TYPE>
-  #define WORKSPACE_SIZE 7168
-  #define WORKSPACE_LEN (WORKSPACE_SIZE / sizeof(TRACE_TYPE))
-#endif
-
-#ifndef BUFFER_SIZE
-  #define BUFFER_SIZE sizeof(BUFFER)
-#endif
-
 
 //Globals
-std::queue<intptr_t> traceStorage;
+std::queue<intptr_t> traceData;
+BUFFER pinBuffer(WORKSPACE_LEN);
 UINT64 icount = 0;
+static int pinfd;
+static BUFFER* pinMap;
+char path[] = "/Users/gvanmou/Desktop/workflowProject/bin/pinMap.out";
 
 //Declarations
 void recordMemRD(void *addr);
 void recordMemWR(void *addr);
 void Instruction( INS ins, void *v );
 void Fini( INT32 code, void *v );
-bool mmapInit(BUFFER* &map, int &fd, char *filePath);
-bool mmapClose(BUFFER* &map, int &fd);
+bool mmapInit();
+bool mmapClose();
 bool bufferTransfer();
-bool bufferCleared(UINT64 icount);
-bool pintoolInit();
+bool bufferCheckAndClear();
+bool PINTOOL_Init();
 
 
 int main( int argc, char *argv[] )
 {
+	PINTOOL_Init();	
 	PIN_Init(argc, argv);
 	
 	INS_AddInstrumentFunction(Instruction, 0);
@@ -66,24 +57,26 @@ int main( int argc, char *argv[] )
 //Pintool
 void recordMemRD(void *addr)
 {
-	traceStorage.push((intptr_t)addr);
-	icount++;
-	if (bufferCleared(icount))
+	if ( bufferCheckAndClear() )
 	{
 		printf("Buffer has been written to and cleared\n");
+		return;
 	}
+	traceData.push( (TRACE_TYPE)addr );
+	icount++;
 	//fprintf(trace, "%p\n", addr);
 }
 
 
 void recordMemWR(void *addr)
 {
-	traceStorage.push((intptr_t)addr);
-	icount++;
-	if (bufferCleared(icount))
+	if ( bufferCheckAndClear() )
 	{
 		printf("Buffer has been written to and cleared\n");
+		return;
 	}
+	traceData.push( (TRACE_TYPE)addr );
+	icount++;
 	//fprintf(trace, "%p\n", addr);
 }
 
@@ -111,22 +104,19 @@ void Instruction( INS ins, void *v )
 
 void Fini( INT32 code, void *v )
 {
-	//Output collected trace to mmap
-	//exportTrace();
+	//One last transfer to clear up any straglers
+	printf("Before buffer transfer...\n");
+	bufferTransfer();
+	mmapClose();
+	printf("\nPIN is finished...goodbye...\n");
 }
 
 
 //Additional Functions
-bool pintoolInit()
+bool PINTOOL_Init()
 {
-	//Init buffer
-	CircularBuffer<intptr_t> pinBuffer(WORKSPACE_LEN);
-	
 	//Init mmap
-	int pinfd;
-	BUFFER* pinMap;
-	char path[] = "/Users/gvanmou/Desktop/workflowProject/bin/pinMap.out";
-	if ( mmapInit(pinMap, pinfd, path) )
+	if ( mmapInit() )
 	{
 		return true;
 	}
@@ -135,60 +125,71 @@ bool pintoolInit()
 
 bool bufferTransfer()
 {
+	//write to buffer
+	printf("\nSize of traceData = %lu\n", traceData.size());
+	int transferCount = pinBuffer.write(traceData);	
+	printf("Before clear...\n");
+	pinBuffer.clear();
+
+	size_t transferSizeActual = transferCount * sizeof(TRACE_TYPE);
+	printf("Actual number of bytes transferred = %lu\n", transferSizeActual);
+	icount = 0;
 	return true;
 }
 
-bool bufferCleared(UINT64 icount)
+bool bufferCheckAndClear()
 {
-	if (icount == WORKSPACE_LEN)
+	if ( icount < (WORKSPACE_LEN-1) )
 	{
-		//WRITE TO BUFFER
-		bufferTransfer();
-		return true;
+		return false;
 	}
-	return false;
+
+	//WRITE TO BUFFER
+	bufferTransfer();
+	return true;
 }
 
-bool mmapInit(BUFFER* &map, int &fd, char *filePath)
+bool mmapInit()
 {        
-	printf("File: %s\n", filePath);    
-	fd = open(filePath, O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
+	printf("File: %s\n", path);    
+	pinfd = open(path, O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
 	     
-	if (fd == -1)
+	if (pinfd == -1)
 	{
 	        perror("File did not *open* properly");
 	        return false;  
 	}
 
 	//touch virtual address to map to physical
-	if (lseek(fd, BUFFER_SIZE, SEEK_SET) == -1)
+	if (lseek(pinfd, BUFFER_SIZE, SEEK_SET) == -1)
 	{
 	        perror("Unable to appropriately size the file");
 	        return false;
 	}
-	write(fd, "", 1); //needed to set the size
-	
-	printf("File size is...%lu bytes\n", BUFFER_SIZE); 
-	map = (BUFFER *)mmap( NULL, BUFFER_SIZE, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0 );
-	if (map == MAP_FAILED)
+	write(pinfd, "", 1); //needed to set the size
+
+	size_t totalSize = BUFFER_SIZE + WORKSPACE_SIZE;	
+	printf("File size is...%lu bytes\n", totalSize); 
+	pinMap = (BUFFER *)mmap( NULL, totalSize, PROT_READ|PROT_WRITE, MAP_SHARED, pinfd, 0 );
+	if (pinMap == MAP_FAILED)
 	{
 	        perror("mmap failed to open");
 	        return false;
 	}
-	printf("Map pointer init = %p\n", (void*)map);
+	printf("Map pointer atOPEN = %p\n", (void*)pinMap);
 	
 	return true;
 }
 
-bool mmapClose(BUFFER* &map, int &fd)
+bool mmapClose()
 {
-	printf("Map pointer close = %p\n", (void*)map);
-    if (munmap(map, BUFFER_SIZE) == -1)
-    {
-            perror("munmap failed");
-            return false;
-    }      
-	if (close(fd) == -1)
+    	printf("Map pointer atCLOSE = %p\n", (void*)pinMap);
+	if (munmap(pinMap, BUFFER_SIZE) == -1)
+    	{
+		perror("munmap failed");
+            	return false;
+	}      
+	if (close(pinfd) == -1)
 	{
 		perror("file did not close");
 		return false;

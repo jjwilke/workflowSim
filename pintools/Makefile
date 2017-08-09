@@ -14,7 +14,7 @@ INCLUDES := \
   -I$(PIN_ROOT)/source/tools/InstLib \
   -I$(PIN_ROOT)/extras/crt/include \
   -I$(SST_CORE)/include/sst/core/interprocess \
-  -I$(PROG_ROOT)/pintools/include
+  -I$(PROG_ROOT)/include
 
 CPPFLAGS := \
   -isystem $(PIN_ROOT)/extras/stlport/include \

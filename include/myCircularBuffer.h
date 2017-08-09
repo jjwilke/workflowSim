@@ -3,6 +3,9 @@
 #define SST_CORE_INTERPROCESS_CIRCULARBUFFER_H
 
 #include "sstmutex.h"
+#include <queue>
+#include <vector>
+#include <macros.h>
 
 namespace SST {
 namespace Core {
@@ -29,22 +32,42 @@ public:
 		__sync_synchronize();
     	}
 
-	T read() {
+	//Read buffer->result vector after clearing result vector
+	bool read(std::vector<T> &result) 
+	{
 		int loop_counter = 0;
+		result.clear();
 
-		while( true ) {
+		while( true ) 
+		{
 			bufferMutex.lock();
-
-			if( readIndex != writeIndex ) {
-				const T result = buffer[readIndex];
-				readIndex = (readIndex + 1) % buffSize;
-
+			
+			if (readIndex == writeIndex)
+			{
 				bufferMutex.unlock();
-				return result;
+				bufferMutex.processorPause(loop_counter++);
+				
+				return false;
 			}
+			while( readIndex != writeIndex ) 
+			{
+				//Mark the end last section being read
+				if ( buffer[readIndex] == 0 )
+				{
+					result.push_back(END_OF_TRACE);
+					bufferMutex.unlock();
+					return true;
+				}
 
-			bufferMutex.unlock();
-			bufferMutex.processorPause(loop_counter++);
+				if ( buffer[readIndex] != 0 )
+				{
+					result.push_back( buffer[readIndex] );
+				}				
+				readIndex = (readIndex + 1) % buffSize;	
+			}
+	
+			bufferMutex.unlock();		
+			return true;
 		}
 	}
 
@@ -64,12 +87,13 @@ public:
 		return false;
 	}
 
-	//Modify to take queue<-----------
-	int write(const T* &v) 	
+	//modify so write() takes a CONST
+	int write(std::queue<T> &v) 	
 	{
 		int loop_counter = 0;
 		int T_count = 0;
-	
+
+		printf("<<< 1 >>>\n");	
 		while( true ) 
 		{
 			bufferMutex.lock();
@@ -83,7 +107,15 @@ public:
 			}
 			while ( ((writeIndex + 1) % buffSize) != readIndex ) 
 			{
-				buffer[writeIndex] = v[T_count];
+				if (!v.empty())
+				{
+					buffer[writeIndex] = v.front();
+					v.pop();
+				}
+				else
+				{
+					buffer[writeIndex] = 0;
+				}
 				writeIndex = (writeIndex + 1) % buffSize;
 				T_count++;
 			}
@@ -98,7 +130,7 @@ public:
 
 	}
 
-	void clearBuffer() {
+	void clear() {
 		bufferMutex.lock();
 		readIndex = writeIndex;
 		__sync_synchronize();

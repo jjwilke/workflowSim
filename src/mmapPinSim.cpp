@@ -11,6 +11,11 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <sstmutex.h>
+#include <macros.h>
+#include <myCircularBuffer.h>
+
+using namespace SST::Core::Interprocess;
 
 unsigned int HIT_COUNT;
 unsigned int MISS_COUNT;
@@ -19,21 +24,22 @@ unsigned int MISS_COUNT;
 //Declarations
 //-----------------------
 //Pin call
-bool exeProg(int argc, const char **argv);
+bool exeProg(int argc, const char **argv, std::vector<TRACE_TYPE> &data);
 bool pinCallFini(pid_t &pid, int &status, int &timeout, int argc, const char **argv);
 
 //Input data
 void printVector(std::vector<intptr_t> &src);
-bool mmapInit(size_t &fileSize, intptr_t *&map, int &fd, char *filePath);
-bool mmapClose(size_t fileSize, intptr_t *&map, int &fd);
+bool mmapInit(size_t size, BUFFER* &map, int &fd, char* filePath);
+bool mmapClose(size_t size, BUFFER* &map, int &fd);
+bool readInTrace(BUFFER &pinBuf, std::vector<TRACE_TYPE> &data);
 
 //Cache sim
-void initSimData(std::vector<intptr_t> &);
-void generateCacheVector(intptr_t, std::vector<intptr_t> &, intptr_t);
-void directCacheSim(std::vector<intptr_t>, std::vector<intptr_t>);
+void initSimData(std::vector<TRACE_TYPE> &);
+void generateCacheVector(intptr_t, std::vector<TRACE_TYPE> &, TRACE_TYPE);
+void directCacheSim(std::vector<TRACE_TYPE>, std::vector<TRACE_TYPE>);
 intptr_t findCacheIndex(intptr_t, intptr_t);
-bool NOT_EQUAL(intptr_t, intptr_t);
-void replaceLineData(intptr_t, std::vector<intptr_t> &, intptr_t);
+bool NOT_EQUAL(TRACE_TYPE, TRACE_TYPE);
+void replaceLineData(intptr_t, std::vector<TRACE_TYPE> &, intptr_t);
 void directSimResults(unsigned int);
 
 
@@ -60,55 +66,35 @@ int main (int argc, char** argv)
 	const char *programCall[100] = {pinCall.c_str(), pinOptions.c_str(), 
 					pintoolCall.c_str(), "--", progCall.c_str(), 
 					nullptr};
-	bool callSuccess = exeProg(my_argc, programCall);		
+
+	// Execute call and read in trace data
+	std::vector<TRACE_TYPE> traceData;
+	bool callSuccess = exeProg(my_argc, programCall, traceData);		
 	if (callSuccess)
 	{
-		//-----------------------
-		//collect trace from mmap to vector
-		//-----------------------
-		int pinfd;
-        	intptr_t *pinMap;
-        	size_t fileSize;
-		size_t traceLen;
-		std::vector<intptr_t> traceData;
-        	char path[] = "/Users/gvanmou/Desktop/workflowProject/bin/mmapPin.out";	
-
-		mmapInit(fileSize, pinMap, pinfd, path);	
-		traceLen = fileSize/sizeof(intptr_t);
-		for (int i = 0; i < traceLen; i++)
-		{
-			traceData.push_back(pinMap[i]);
-		}
-		mmapClose(fileSize, pinMap, pinfd);
 
 
-		//-----------------------
-		//print collected trace data
-		//-----------------------
-		//printVector(traceData);
-
-
-		//-----------------------
+/*		//-----------------------
 		//cache sim
 		//-----------------------
 		// Gather user data for cache
-                std::vector<intptr_t> cache;
-                initSimData(cache);
-                unsigned int cache_size = cache.size();
+        std::vector<intptr_t> cache;
+        initSimData(cache);
+        unsigned int cache_size = cache.size();
 
-                // Run simulation
-                HIT_COUNT = 0;
-                MISS_COUNT = 0;
-                directCacheSim(traceData, cache);
-                directSimResults(cache_size);
-				
+        // Run simulation
+        HIT_COUNT = 0;
+        MISS_COUNT = 0;
+        directCacheSim(traceData, cache);
+        directSimResults(cache_size);
+*/				
 	}
 	
 	return 0;
 }
 
 
-bool exeProg(int argc, const char **argv)
+bool exeProg(int argc, const char **argv, std::vector<TRACE_TYPE> &data)
 {
 	pid_t pid;
 	int status;
@@ -125,11 +111,32 @@ bool exeProg(int argc, const char **argv)
 		//-----------------------
 		// Child Process
 		//-----------------------
-		if (execve(argv[0], (char **)argv, nullptr))
+		if ( execve(argv[0], (char **)argv, nullptr) )
 		{
 			perror("Error: Program failed to execute");
 			return false;
 		}
+
+		//-----------------------
+		//collect trace from mmap to vector
+		//-----------------------
+		int pinfd;
+        BUFFER* pinMap;
+		BUFFER pinBuffer(WORKSPACE_LEN);
+		size_t totalSize = (size_t)(BUFFER_SIZE + WORKSPACE_SIZE);
+        char path[] = "/Users/gvanmou/Desktop/workflowProject/bin/pinMap.out";	
+
+		mmapInit(totalSize, pinMap, pinfd, path);	
+
+		readInTrace(pinBuffer, data);
+
+		mmapClose(totalSize, pinMap, pinfd);
+
+
+		//-----------------------
+		//print collected trace data
+		//-----------------------
+		//printVector(traceData);
 	}
 
 	//-----------------------
@@ -180,41 +187,41 @@ void printVector(std::vector<intptr_t> &src)
 	}
 }
 
-bool mmapInit(size_t &fileSize, intptr_t *&map, int &fd, char *filePath)
+bool mmapInit(size_t size, BUFFER* &map, int &fd, char *filePath)
 {     
-        printf("File: %s\n", filePath);
-        fd = open(filePath, O_RDONLY, (mode_t)0600);
+    printf("File: %s\n", filePath);
+    fd = open(filePath, O_RDONLY, (mode_t)0600);
 
-        if (fd == -1)
-        {
-                perror("File did not *open* properly");
-                return false;
-        }
+    if (fd == -1)
+    {
+            perror("File did not *open* properly");
+            return false;
+    }
 	
-	struct stat file = {0};
-	if ( fstat(fd, &file) == -1)
-	{
-		perror("Error collecting the file size.");
-		return false;
-	}
-	fileSize = file.st_size - 1;
+	//struct stat file = {0};
+	//if ( fstat(fd, &file) == -1)
+	//{
+	//	perror("Error collecting the file size.");
+	//	return false;
+	//}
+	//fileSize = file.st_size - 1;
 
-        printf("File size is...%lu bytes\n", fileSize);
-        map = (intptr_t *)mmap(NULL, fileSize, PROT_READ, MAP_SHARED, fd, 0);
-        if (map == MAP_FAILED)
-        {       
-                perror("mmap failed to open");
-                return false;
-        }
-        printf("Map pointer init = %p\n", (void*)map);
+    printf("File size is...%lu bytes\n", size);
+    map = (BUFFER *) mmap( NULL, size, PROT_READ, MAP_SHARED, fd, 0 );
+    if (map == MAP_FAILED)
+    {       
+            perror("mmap failed to open");
+            return false;
+    }
+    printf("Map pointer atOPEN = %p\n", (void*)map);
 
-        return true;
+    return true;
 }
 
-bool mmapClose(size_t fileSize, intptr_t *&map, int &fd)
+bool mmapClose(size_t size, BUFFER* &map, int &fd)
 {
-        printf("Map pointer close = %p\n", (void*)map);
-        if (munmap(map, fileSize) == -1)
+        printf("Map pointer atCLOSE = %p\n", (void*)map);
+        if (munmap(map, size) == -1)
         {
                 perror("munmap failed");
                 return false;
@@ -226,6 +233,38 @@ bool mmapClose(size_t fileSize, intptr_t *&map, int &fd)
         }
 
         return true;
+}
+
+bool readInTrace(BUFFER &pinBuf, std::vector<TRACE_TYPE> &result)
+{
+	std::vector<TRACE_TYPE> temp;
+	
+	printf("In readInTrace()....\n");
+	while ( true )
+	{
+		//Wait until there is something in the buffer to read
+		printf("waiting to read");
+		while ( !pinBuf.read(temp) ) 
+		{
+			printf(".");
+		}
+		
+		printf("\nCompiling result vector...\n");
+		printf("Vector to add is %lu elements long\n", temp.size());
+
+		//Add temp to result vector
+		int index = 0;
+		for (int i = 0; i < temp.size(); i++)
+		{
+			if ( temp[i] == END_OF_TRACE )
+			{
+				return true;
+			}
+			result[index] = temp[i];
+			index++;
+		}
+	}
+	return false;
 }
 
 void initSimData(std::vector<intptr_t> &cache_vector)
