@@ -10,6 +10,7 @@
 #include <cstdlib>
 #include <stdlib.h>
 #include <iostream>
+#include <semaphore.h>
 #include <sstmutex.h>
 #include <myCircularBuffer.h>
 #include <macros.h>
@@ -18,12 +19,12 @@ using namespace SST::Core::Interprocess;
 
 
 //Globals
-std::queue<intptr_t> traceData;
-BUFFER pinBuffer(WORKSPACE_LEN);
+std::queue<TRACE_TYPE> traceData;
 UINT64 icount = 0;
+sem_t realMutex;
+static BUFFER pinBuffer(WORKSPACE_LEN);
 static int pinfd;
 static BUFFER* pinMap;
-char path[] = "/Users/gvanmou/Desktop/workflowProject/bin/pinMap.out";
 
 //Declarations
 void recordMemRD(void *addr);
@@ -34,7 +35,7 @@ bool mmapInit();
 bool mmapClose();
 bool bufferTransfer();
 bool bufferCheckAndClear();
-bool PINTOOL_Init();
+void PINTOOL_Init();
 
 
 int main( int argc, char *argv[] )
@@ -80,7 +81,6 @@ void recordMemWR(void *addr)
 	//fprintf(trace, "%p\n", addr);
 }
 
-
 void Instruction( INS ins, void *v )
 {	
 	UINT32 memOperands = INS_MemoryOperandCount(ins);
@@ -107,34 +107,29 @@ void Fini( INT32 code, void *v )
 	//One last transfer to clear up any straglers
 	printf("Before buffer transfer...\n");
 	bufferTransfer();
+	
 	mmapClose();
+	sem_close(&realMutex);
+
 	printf("\nPIN is finished...goodbye...\n");
 }
 
 
 //Additional Functions
-bool PINTOOL_Init()
+void PINTOOL_Init()
 {
 	//Init mmap
 	if ( mmapInit() )
 	{
+		//init a process-shared and unlocked semaphore
+		if ( sem_init(&realMutex, 1, 0) == -1)
+		{
+			perror("Semaphore did not initialize properly");
+			return false;
+		}
 		return true;
 	}
 	return false;
-}
-
-bool bufferTransfer()
-{
-	//write to buffer
-	printf("\nSize of traceData = %lu\n", traceData.size());
-	int transferCount = pinBuffer.write(traceData);	
-	printf("Before clear...\n");
-	pinBuffer.clear();
-
-	size_t transferSizeActual = transferCount * sizeof(TRACE_TYPE);
-	printf("Actual number of bytes transferred = %lu\n", transferSizeActual);
-	icount = 0;
-	return true;
 }
 
 bool bufferCheckAndClear()
@@ -145,14 +140,39 @@ bool bufferCheckAndClear()
 	}
 
 	//WRITE TO BUFFER
-	bufferTransfer();
+	return bufferTransfer();
+}
+
+bool bufferTransfer()
+{
+	//write to buffer
+	printf("\nSize of traceData = %lu\n", traceData.size());
+	int transferCount = pinBuffer.write(traceData);	
+	printf("Before clear...\n");
+
+	//-----------------------
+	//Critical Regions
+	//-----------------------
+	sem_wait(&realMutex);
+	pinMap[0] = pinBuffer;
+	sem_post(&realMutex);	
+
+	pinBuffer.clear();
+	sem_wait(&realMutex);
+	pinMap[0] = pinBuffer;
+	sem_post(&realMutex);	
+	//-----------------------
+
+	size_t transferSizeActual = transferCount * sizeof(TRACE_TYPE);
+	printf("Actual number of bytes transferred = %lu\n", transferSizeActual);
+	icount = 0;
 	return true;
 }
 
 bool mmapInit()
 {        
-	printf("File: %s\n", path);    
-	pinfd = open(path, O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
+	printf("File: %s\n", PATH);    
+	pinfd = open(PATH, O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
 	     
 	if (pinfd == -1)
 	{
@@ -176,15 +196,15 @@ bool mmapInit()
 	        perror("mmap failed to open");
 	        return false;
 	}
-	printf("Map pointer atOPEN = %p\n", (void*)pinMap);
+	printf("[Child] Map pointer atOPEN = %p\n", (void*)pinMap);
 	
 	return true;
 }
 
 bool mmapClose()
 {
-    	printf("Map pointer atCLOSE = %p\n", (void*)pinMap);
-	if (munmap(pinMap, BUFFER_SIZE) == -1)
+	printf("[Child] Map pointer atCLOSE = %p\n", (void*)pinMap);
+	if ( munmap(pinMap, BUFFER_SIZE) == -1 )
     	{
 		perror("munmap failed");
             	return false;

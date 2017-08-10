@@ -36,24 +36,32 @@ public:
 	bool read(std::vector<T> &result) 
 	{
 		int loop_counter = 0;
+		bool notReady = true;
 		result.clear();
 
 		while( true ) 
 		{
 			bufferMutex.lock();
-			
+			//printf("Loop counter value = %d\n", loop_counter);
+			//printf(" readIndex = %lu\n", readIndex);
+			//printf("writeIndex = %lu\n", writeIndex);
+
 			if (readIndex == writeIndex)
 			{
+				printf("Inside [r]check #1\n");
 				bufferMutex.unlock();
 				bufferMutex.processorPause(loop_counter++);
 				
-				return false;
+				continue;
 			}
+
+			printf("Reading data...\n");
 			while( readIndex != writeIndex ) 
 			{
 				//Mark the end last section being read
 				if ( buffer[readIndex] == 0 )
 				{
+					printf("Found a 0!\n");
 					result.push_back(END_OF_TRACE);
 					bufferMutex.unlock();
 					return true;
@@ -65,7 +73,7 @@ public:
 				}				
 				readIndex = (readIndex + 1) % buffSize;	
 			}
-	
+			
 			bufferMutex.unlock();		
 			return true;
 		}
@@ -96,15 +104,20 @@ public:
 		printf("<<< 1 >>>\n");	
 		while( true ) 
 		{
+			printf("Inside [w]check #1\n");
 			bufferMutex.lock();
 			
 			if ( ((writeIndex + 1) % buffSize) == readIndex )
 			{
+				printf("Inside [w]check #2\n");
+				
 				bufferMutex.unlock();
 				bufferMutex.processorPause(loop_counter++);
 				
 				return 0;
 			}
+			
+			printf("writing data...\n");
 			while ( ((writeIndex + 1) % buffSize) != readIndex ) 
 			{
 				if (!v.empty())
@@ -119,6 +132,10 @@ public:
 				writeIndex = (writeIndex + 1) % buffSize;
 				T_count++;
 			}
+			
+			printf("Write index = %lu\n", writeIndex);
+			printf(" Read index = %lu\n", readIndex);
+
 			__sync_synchronize();
 			bufferMutex.unlock();
 		

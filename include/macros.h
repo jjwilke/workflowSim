@@ -17,5 +17,9 @@
   #define BUFFER_SIZE sizeof(BUFFER)
 #endif
 
+#ifndef PATH
+  #define PATH "/Users/gvanmou/Desktop/workflowProject/bin/pinMap.out"
+#endif
+
 
 #endif

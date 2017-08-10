@@ -29,7 +29,7 @@ bool pinCallFini(pid_t &pid, int &status, int &timeout, int argc, const char **a
 
 //Input data
 void printVector(std::vector<intptr_t> &src);
-bool mmapInit(size_t size, BUFFER* &map, int &fd, char* filePath);
+bool mmapInit(size_t size, BUFFER* &map, int &fd);
 bool mmapClose(size_t size, BUFFER* &map, int &fd);
 bool readInTrace(BUFFER &pinBuf, std::vector<TRACE_TYPE> &data);
 
@@ -117,31 +117,29 @@ bool exeProg(int argc, const char **argv, std::vector<TRACE_TYPE> &data)
 			return false;
 		}
 
-		//-----------------------
-		//collect trace from mmap to vector
-		//-----------------------
-		int pinfd;
-        BUFFER* pinMap;
-		BUFFER pinBuffer(WORKSPACE_LEN);
-		size_t totalSize = (size_t)(BUFFER_SIZE + WORKSPACE_SIZE);
-        char path[] = "/Users/gvanmou/Desktop/workflowProject/bin/pinMap.out";	
-
-		mmapInit(totalSize, pinMap, pinfd, path);	
-
-		readInTrace(pinBuffer, data);
-
-		mmapClose(totalSize, pinMap, pinfd);
-
-
-		//-----------------------
-		//print collected trace data
-		//-----------------------
-		//printVector(traceData);
 	}
 
 	//-----------------------
 	// Parent Process
 	//-----------------------
+
+	//-----------------------
+	//collect trace from mmap to vector
+	//-----------------------	
+	int pinfd;
+	BUFFER* pinMap;
+	BUFFER pinBuffer(WORKSPACE_LEN);
+	size_t totalSize = (size_t)(BUFFER_SIZE + WORKSPACE_SIZE);
+
+	mmapInit(totalSize, pinMap, pinfd);	
+	pinBuffer = *pinMap;
+	//readInTrace(pinBuffer, data);
+	mmapClose(totalSize, pinMap, pinfd);
+
+	//-----------------------
+	//print collected trace data
+	//-----------------------
+	//printVector(traceData);
 	
 	//Wait for child and summarize fork call
 	return pinCallFini(pid, status, timeout, argc, argv);	
@@ -187,10 +185,10 @@ void printVector(std::vector<intptr_t> &src)
 	}
 }
 
-bool mmapInit(size_t size, BUFFER* &map, int &fd, char *filePath)
+bool mmapInit(size_t size, BUFFER* &map, int &fd)
 {     
-    printf("File: %s\n", filePath);
-    fd = open(filePath, O_RDONLY, (mode_t)0600);
+    printf("File: %s\n", PATH);
+    fd = open(PATH, O_RDONLY, (mode_t)0600);
 
     if (fd == -1)
     {
@@ -213,14 +211,14 @@ bool mmapInit(size_t size, BUFFER* &map, int &fd, char *filePath)
             perror("mmap failed to open");
             return false;
     }
-    printf("Map pointer atOPEN = %p\n", (void*)map);
+    printf("[Parent] Map pointer atOPEN = %p\n", (void*)map);
 
     return true;
 }
 
 bool mmapClose(size_t size, BUFFER* &map, int &fd)
 {
-        printf("Map pointer atCLOSE = %p\n", (void*)map);
+        printf("[Parent] Map pointer atCLOSE = %p\n", (void*)map);
         if (munmap(map, size) == -1)
         {
                 perror("munmap failed");
@@ -239,18 +237,17 @@ bool readInTrace(BUFFER &pinBuf, std::vector<TRACE_TYPE> &result)
 {
 	std::vector<TRACE_TYPE> temp;
 	
-	printf("In readInTrace()....\n");
 	while ( true )
 	{
 		//Wait until there is something in the buffer to read
-		printf("waiting to read");
+		printf("waiting to read...\n");
 		while ( !pinBuf.read(temp) ) 
 		{
-			printf(".");
+			//mS delay
+			usleep(1000);
 		}
 		
-		printf("\nCompiling result vector...\n");
-		printf("Vector to add is %lu elements long\n", temp.size());
+		printf("Adding vector to result of %lu elements\n", temp.size());
 
 		//Add temp to result vector
 		int index = 0;
