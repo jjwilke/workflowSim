@@ -21,7 +21,8 @@ using namespace SST::Core::Interprocess;
 //Globals
 std::queue<TRACE_TYPE> traceData;
 UINT64 icount = 0;
-sem_t realMutex;
+sem_t *empty = NULL;
+sem_t *full = NULL;
 static BUFFER pinBuffer(WORKSPACE_LEN);
 static int pinfd;
 static BUFFER* pinMap;
@@ -35,7 +36,7 @@ bool mmapInit();
 bool mmapClose();
 bool bufferTransfer();
 bool bufferCheckAndClear();
-void PINTOOL_Init();
+bool PINTOOL_Init();
 
 
 int main( int argc, char *argv[] )
@@ -109,22 +110,26 @@ void Fini( INT32 code, void *v )
 	bufferTransfer();
 	
 	mmapClose();
-	sem_close(&realMutex);
+	sem_close(empty);
+	sem_close(full);
 
 	printf("\nPIN is finished...goodbye...\n");
 }
 
 
 //Additional Functions
-void PINTOOL_Init()
+bool PINTOOL_Init()
 {
 	//Init mmap
 	if ( mmapInit() )
 	{
-		//init a process-shared and unlocked semaphore
-		if ( sem_init(&realMutex, 1, 0) == -1)
+		//init semaphores
+		empty = sem_open(EMPTY, O_CREAT | O_EXCL, 0664, 1);
+		full = sem_open(FULL, O_CREAT | O_EXCL, 0664, 0);
+		
+		if ( empty == NULL || full == NULL )
 		{
-			perror("Semaphore did not initialize properly");
+			perror("Semaphores were not created in parent process");
 			return false;
 		}
 		return true;
@@ -151,16 +156,11 @@ bool bufferTransfer()
 	printf("Before clear...\n");
 
 	//-----------------------
-	//Critical Regions
+	//Critical Region
 	//-----------------------
-	sem_wait(&realMutex);
+	sem_wait(empty);
 	pinMap[0] = pinBuffer;
-	sem_post(&realMutex);	
-
-	pinBuffer.clear();
-	sem_wait(&realMutex);
-	pinMap[0] = pinBuffer;
-	sem_post(&realMutex);	
+	sem_post(full);	
 	//-----------------------
 
 	size_t transferSizeActual = transferCount * sizeof(TRACE_TYPE);

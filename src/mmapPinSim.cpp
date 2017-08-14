@@ -11,6 +11,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
+#include <semaphore.h>
 #include <sstmutex.h>
 #include <macros.h>
 #include <myCircularBuffer.h>
@@ -19,6 +20,8 @@ using namespace SST::Core::Interprocess;
 
 unsigned int HIT_COUNT;
 unsigned int MISS_COUNT;
+sem_t *empty = NULL;
+sem_t *full = NULL;
 
 //-----------------------
 //Declarations
@@ -31,7 +34,7 @@ bool pinCallFini(pid_t &pid, int &status, int &timeout, int argc, const char **a
 void printVector(std::vector<intptr_t> &src);
 bool mmapInit(size_t size, BUFFER* &map, int &fd);
 bool mmapClose(size_t size, BUFFER* &map, int &fd);
-bool readInTrace(BUFFER &pinBuf, std::vector<TRACE_TYPE> &data);
+bool readInTrace(BUFFER* &pinMap, std::vector<TRACE_TYPE> &data);
 
 //Cache sim
 void initSimData(std::vector<TRACE_TYPE> &);
@@ -48,11 +51,12 @@ void directSimResults(unsigned int);
 //-----------------------
 int main (int argc, char** argv)
 {
+    typo
 	//VARIABLES
 	// To modify
 	std::string home = "/Users/gvanmou"; //would use $HOME, but execve does not read
 	std::string pinRoot = home + "/install/pin-3.2-81205-clang-mac/";
-	std::string pintool = "traceTest";
+	std::string pintool = "traceTest.dylib";
 	std::string progToTrace = "forkTest";
 
 	std::string pinCall = pinRoot + "pin";
@@ -60,6 +64,15 @@ int main (int argc, char** argv)
 	std::string pintoolCall = "bin/" + pintool;
 	std::string progCall = "bin/" + progToTrace;
 		
+	// Semaphores
+	empty = sem_open(EMPTY, O_CREAT, 0664, 1);
+	full = sem_open(FULL, O_CREAT, 0664, 0);
+	if ( empty == NULL || full == NULL)
+	{
+		perror("Semaphores were not initialized properly");
+		return -1;
+	}
+
 
 	// Pin call
 	int my_argc = 5;
@@ -128,13 +141,13 @@ bool exeProg(int argc, const char **argv, std::vector<TRACE_TYPE> &data)
 	//-----------------------	
 	int pinfd;
 	BUFFER* pinMap;
-	BUFFER pinBuffer(WORKSPACE_LEN);
 	size_t totalSize = (size_t)(BUFFER_SIZE + WORKSPACE_SIZE);
 
 	mmapInit(totalSize, pinMap, pinfd);	
-	pinBuffer = *pinMap;
-	//readInTrace(pinBuffer, data);
+	readInTrace(pinMap, data);
 	mmapClose(totalSize, pinMap, pinfd);
+	sem_unlink(EMPTY);
+	sem_unlink(FULL);
 
 	//-----------------------
 	//print collected trace data
@@ -233,19 +246,27 @@ bool mmapClose(size_t size, BUFFER* &map, int &fd)
         return true;
 }
 
-bool readInTrace(BUFFER &pinBuf, std::vector<TRACE_TYPE> &result)
+bool readInTrace(BUFFER* &pinMap, std::vector<TRACE_TYPE> &result)
 {
 	std::vector<TRACE_TYPE> temp;
+	BUFFER pinBuf(WORKSPACE_LEN);
 	
 	while ( true )
 	{
 		//Wait until there is something in the buffer to read
 		printf("waiting to read...\n");
-		while ( !pinBuf.read(temp) ) 
+		//-----------------------
+        	//Critical Region
+        	//-----------------------	
+		sem_wait(full);
+		pinBuf = pinMap[0];
+		if ( pinBuf.read(temp) ) 
 		{
-			//mS delay
-			usleep(1000);
+			pinBuf.clear();
+			pinMap[0] = pinBuf;
 		}
+		sem_post(empty);
+        	//-----------------------	
 		
 		printf("Adding vector to result of %lu elements\n", temp.size());
 

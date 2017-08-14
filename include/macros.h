@@ -1,10 +1,13 @@
 #ifndef MACROS_H_
 #define MACROS_H_
 
+//typedef intptr_t trace_entry_t; //98
+//using trace_entry_t = intptr_t; //11
+
+//static const int END_OF_TRACE = -7777;
+//constexpr int const END_OF_TRACE = -7777; 
 
 #ifndef TRACE_TYPE
-  #define TRACE_TYPE intptr_t
-  #define END_OF_TRACE -7777
 #endif
 
 #ifdef TRACE_TYPE
@@ -19,6 +22,8 @@
 
 #ifndef PATH
   #define PATH "/Users/gvanmou/Desktop/workflowProject/bin/pinMap.out"
+  #define EMPTY (const char*)"empty"
+  #define FULL (const char*)"full"
 #endif
 
 

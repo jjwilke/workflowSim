@@ -26,7 +26,7 @@ int main (int argc, char** argv)
 	
 	//Do something with mmap
 	
-	
+
 	
 	if (mmapExit(map, memBuf))
 	{
