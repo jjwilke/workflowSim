@@ -29,9 +29,9 @@ bool pinCallFini(pid_t &pid, int &status, int &timeout, int argc, const char **a
 
 //Input data
 void printVector(std::vector<intptr_t> &src);
-bool mmapInit(size_t size, BUFFER* &map, int &fd);
-bool mmapClose(size_t size, BUFFER* &map, int &fd);
-bool readInTrace(BUFFER* &pinMap, std::vector<trace_entry_t> &data);
+bool mmapInit(size_t size, cir_buf_t* &map, int &fd);
+bool mmapClose(size_t size, cir_buf_t* &map, int &fd);
+bool readInTrace(cir_buf_t* &pinMap, std::vector<trace_entry_t> &data);
 
 //Cache sim
 void initSimData(std::vector<trace_entry_t> &);
@@ -127,8 +127,8 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
 	//collect trace from mmap to vector
 	//-----------------------	
 	int pinfd;
-	BUFFER* pinMap;
-	size_t totalSize = (size_t)(BUFFER_SIZE + WORKSPACE_SIZE);
+	cir_buf_t* pinMap;
+	size_t totalSize = (size_t)(cir_buf_t_SIZE + WORKSPACE_SIZE);
 
 	mmapInit(totalSize, pinMap, pinfd);	
 	readInTrace(pinMap, data);
@@ -183,7 +183,7 @@ void printVector(std::vector<intptr_t> &src)
 	}
 }
 
-bool mmapInit(size_t size, BUFFER* &map, int &fd)
+bool mmapInit(size_t size, cir_buf_t* &map, int &fd)
 {     
     printf("File: %s\n", MMAP_PATH);
     fd = open(MMAP_PATH, O_RDONLY, (mode_t)0600);
@@ -203,7 +203,7 @@ bool mmapInit(size_t size, BUFFER* &map, int &fd)
 	//fileSize = file.st_size - 1;
 
     printf("File size is...%lu bytes\n", size);
-    map = (BUFFER *) mmap( NULL, size, PROT_READ, MAP_SHARED, fd, 0 );
+    map = (cir_buf_t *) mmap( NULL, size, PROT_READ, MAP_SHARED, fd, 0 );
     if (map == MAP_FAILED)
     {       
             perror("mmap failed to open");
@@ -214,7 +214,7 @@ bool mmapInit(size_t size, BUFFER* &map, int &fd)
     return true;
 }
 
-bool mmapClose(size_t size, BUFFER* &map, int &fd)
+bool mmapClose(size_t size, cir_buf_t* &map, int &fd)
 {
         printf("[Parent] Map pointer atCLOSE = %p\n", (void*)map);
         if (munmap(map, size) == -1)
@@ -231,14 +231,14 @@ bool mmapClose(size_t size, BUFFER* &map, int &fd)
         return true;
 }
 
-bool readInTrace(BUFFER* &pinMap, std::vector<trace_entry_t> &result)
+bool readInTrace(cir_buf_t* &pinMap, std::vector<trace_entry_t> &result)
 {
     std::vector<trace_entry_t> temp;
-	BUFFER pinBuf(WORKSPACE_LEN);
+	cir_buf_t pinBuf(WORKSPACE_LEN);
 	
 	while ( true )
 	{
-		//Wait until there is something in the buffer to read
+		//Wait until there is something in the cir_buf_t to read
 		printf("waiting to read...\n");
 
         //-----------------------

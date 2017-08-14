@@ -24,3 +24,4 @@ run
 runclean
 runmake
 traceTest.out
+include/TraceTunnel.h

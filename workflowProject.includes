@@ -1,1 +1,4 @@
-include
+includes:
+/Users/gvanmou/install/sstcore-7.1.0/include/sst/core/interprocess
+/Users/gvanmou/install/pin-3.2-81205-clang-mac/source/include/pin
+/Users/gvanmou/Desktop/workflowProject/include

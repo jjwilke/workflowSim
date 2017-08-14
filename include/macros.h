@@ -1,30 +1,28 @@
 #ifndef MACROS_H_
 #define MACROS_H_
 
+#include <myCircularBuffer.h>
+
+using namespace SST::Core::Interprocess;
+
 //typedef intptr_t trace_entry_t; //98
-//using trace_entry_t = intptr_t; //11
+using trace_entry_t = intptr_t; //11
+using cir_buf_t = CircularBuffer<trace_entry_t>;
+using cir_buf_pair_t = std::pair<size_t, cir_buf_t*>;
+using cir_buf_make_pair_t = std::make_pair<size_t, cir_buf_t*>;
 
 //static const int END_OF_TRACE = -7777;
-//constexpr int const END_OF_TRACE = -7777; 
+constexpr trace_entry_t const END_OF_TRACE = -7777;
+constexpr int const WORKSPACE_SIZE = 7186;
+constexpr int const TRACE_ENTRY_SIZE = sizeof(trace_entry_t);
+constexpr int const WORKSPACE_LEN = (WORKSPACE_SIZE / TRACE_ENTRY_SIZE);
+constexpr int const CIR_BUF_SIZE = sizeof(cir_buf_t);
 
-#ifndef TRACE_TYPE
-#endif
-
-#ifdef TRACE_TYPE
-  #define BUFFER CircularBuffer<TRACE_TYPE>
-  #define WORKSPACE_SIZE 7168
-  #define WORKSPACE_LEN (WORKSPACE_SIZE / sizeof(TRACE_TYPE))
-#endif
-
-#ifndef BUFFER_SIZE
-  #define BUFFER_SIZE sizeof(BUFFER)
-#endif
-
-#ifndef PATH
-  #define PATH "/Users/gvanmou/Desktop/workflowProject/bin/pinMap.out"
-  #define EMPTY (const char*)"empty"
-  #define FULL (const char*)"full"
+#ifndef MMAP_PATH
+    #define MMAP_PATH "/Users/gvanmou/Desktop/workflowProject/bin/pinMap.out"
 #endif
 
 
-#endif
+
+
+#endif /* MACROS_H_ */

@@ -17,12 +17,9 @@
 
 using namespace SST::Core::Interprocess;
 
-
 //Globals
 std::queue<TRACE_TYPE> traceData;
 UINT64 icount = 0;
-sem_t *empty = NULL;
-sem_t *full = NULL;
 static BUFFER pinBuffer(WORKSPACE_LEN);
 static int pinfd;
 static BUFFER* pinMap;
@@ -109,9 +106,7 @@ void Fini( INT32 code, void *v )
 	printf("Before buffer transfer...\n");
 	bufferTransfer();
 	
-	mmapClose();
-	sem_close(empty);
-	sem_close(full);
+    mmapClose();
 
 	printf("\nPIN is finished...goodbye...\n");
 }
@@ -123,11 +118,8 @@ bool PINTOOL_Init()
 	//Init mmap
 	if ( mmapInit() )
 	{
-		//init semaphores
-		empty = sem_open(EMPTY, O_CREAT | O_EXCL, 0664, 1);
-		full = sem_open(FULL, O_CREAT | O_EXCL, 0664, 0);
-		
-		if ( empty == NULL || full == NULL )
+        //init locks
+        if (  )
 		{
 			perror("Semaphores were not created in parent process");
 			return false;
@@ -157,10 +149,8 @@ bool bufferTransfer()
 
 	//-----------------------
 	//Critical Region
-	//-----------------------
-	sem_wait(empty);
-	pinMap[0] = pinBuffer;
-	sem_post(full);	
+    //-----------------------
+    pinMap[0] = pinBuffer;
 	//-----------------------
 
 	size_t transferSizeActual = transferCount * sizeof(TRACE_TYPE);
@@ -171,8 +161,8 @@ bool bufferTransfer()
 
 bool mmapInit()
 {        
-	printf("File: %s\n", PATH);    
-	pinfd = open(PATH, O_RDWR | O_CREAT | O_TRUNC, (mode_t)0600);
+    printf("File: %s\n", MMAP_PATH);
+    pinfd = open(MMAP_PATH, O_RDWR|O_CREAT|O_TRUNC, (mode_t)0600);
 	     
 	if (pinfd == -1)
 	{

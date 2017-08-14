@@ -5,7 +5,6 @@
 #include "sstmutex.h"
 #include <queue>
 #include <vector>
-#include <macros.h>
 
 namespace SST {
 namespace Core {
@@ -62,7 +61,7 @@ public:
 				if ( buffer[readIndex] == 0 )
 				{
 					printf("Found a 0!\n");
-					result.push_back(END_OF_TRACE);
+                    //result.push_back(END_OF_TRACE);
 					bufferMutex.unlock();
 					return true;
 				}
