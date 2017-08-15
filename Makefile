@@ -7,10 +7,10 @@ CC := g++
 INCLUDES := \
 	-I$(PROG_ROOT)/include \
 	-I$(SST_CORE)/include/sst/core/interprocess
-CXXFLAGS := -std=c++11
+CXXFLAGS := 
 CPPFLAGS :=
 CFLAGS :=
-LDFLAGS :=
+LDFLAGS := -std=c++11
 LIBS := 
 
 TARGET = bin/$(PROGRAM_NAME)

@@ -11,27 +11,22 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <sys/mman.h>
-#include <semaphore.h>
-#include <sstmutex.h>
-#include <macros.h>
+
+#include <PinTunnel.h>
 
 using namespace SST::Core::Interprocess;
 
 unsigned int HIT_COUNT;
 unsigned int MISS_COUNT;
 
-//-----------------------
-//Declarations
-//-----------------------
+
 //Pin call
 bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data);
 bool pinCallFini(pid_t &pid, int &status, int &timeout, int argc, const char **argv);
 
 //Input data
 void printVector(std::vector<intptr_t> &src);
-bool mmapInit(size_t size, BUFFER* &map, int &fd);
-bool mmapClose(size_t size, BUFFER* &map, int &fd);
-bool readInTrace(BUFFER* &pinMap, std::vector<trace_entry_t> &data);
+bool readInTrace(PinTunnel<trace_entry_t> &tunnel, size_t &bufferIndex, std::vector<trace_entry_t> &data);
 
 //Cache sim
 void initSimData(std::vector<trace_entry_t> &);
@@ -52,20 +47,19 @@ int main (int argc, char** argv)
 	//VARIABLES
 	// To modify
 	std::string home = "/Users/gvanmou"; //would use $HOME, but execve does not read
-	std::string pinRoot = home + "/install/pin-3.2-81205-clang-mac/";
-	std::string pintool = "traceTest.dylib";
-	std::string progToTrace = "forkTest";
+    std::string pinCall = home + "/install/pin-3.2-81205-clang-mac/pin";
+    std::string pintool = "traceTest.dylib";
+    std::string progToTrace = "forkTest";
 
-	std::string pinCall = pinRoot + "pin";
 	std::string pinOptions = "-t";
 	std::string pintoolCall = "bin/" + pintool;
     std::string progCall = "bin/" + progToTrace;
 
 	// Pin call
 	int my_argc = 5;
-	const char *programCall[100] = {pinCall.c_str(), pinOptions.c_str(), 
+    const char *programCall[100] = {pinCall.c_str(), pinOptions.c_str(),
 					pintoolCall.c_str(), "--", progCall.c_str(), 
-					nullptr};
+                    nullptr};
 
 	// Execute call and read in trace data
     std::vector<trace_entry_t> traceData;
@@ -99,6 +93,9 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
 	pid_t pid;
 	int status;
 	int timeout;
+
+    //Make sure initial tunnel exists
+    //PinTunnel<trace_entry_t> traceTunnel(NUM_OF_BUFFERS, WORKSPACE_LEN, 1);
 	
 	pid = fork();
 	if (pid < 0)
@@ -123,21 +120,12 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
 	// Parent Process
 	//-----------------------
 
-	//-----------------------
-	//collect trace from mmap to vector
-	//-----------------------	
-	int pinfd;
-	BUFFER* pinMap;
-	size_t totalSize = (size_t)(BUFFER_SIZE + WORKSPACE_SIZE);
+    //Collect Trace
+    //size_t bufferIndex = 0;
+    //readInTrace(traceTunnel, bufferIndex, data);
 
-	mmapInit(totalSize, pinMap, pinfd);	
-	readInTrace(pinMap, data);
-	mmapClose(totalSize, pinMap, pinfd);
-
-	//-----------------------
-	//print collected trace data
-	//-----------------------
-	//printVector(traceData);
+    //TEST
+    //printVector(data);
 	
 	//Wait for child and summarize fork call
 	return pinCallFini(pid, status, timeout, argc, argv);	
@@ -145,117 +133,32 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
 }
 
 
-bool pinCallFini(pid_t &pid, int &status, int &timeout, int argc, const char **argv)
+/*
+ * Fork functions
+ */
+bool readInTrace(PinTunnel<trace_entry_t> &tunnel, size_t &bufferIndex, std::vector<trace_entry_t> &result)
 {
-	timeout = 1000;
-	while (0 == waitpid(pid, &status, WNOHANG))
-	{
-		if (--timeout < 0)
-		{
-			perror("Timeout...");
-			return false;
-		}
-		sleep(1);
-	}
-
-	std::cout << std::endl << "Fork() Summary:" << std::endl;
-	for (int i = 0; i < argc; i++)
-	{
-		std::cout << "argv[" << i << "]= " << argv[i] << std::endl;
-	}
-	std::cout << "ExitStatus=" << WEXITSTATUS(status);
-	std::cout << " WIFEXITED=" << WIFEXITED(status) << " Status=";
-	std::cout << status << std::endl;
-
-	if (0 != WEXITSTATUS(status) || 1 != WIFEXITED(status))
-	{
-		perror("Call failed");
-		return false;
-	}
-	return true;	
-}
-
-void printVector(std::vector<intptr_t> &src)
-{
-	for (int i = 0; i < src.size(); i++)
-	{
-		std::cout << "[" << i << "]: " << src[i] << std::endl;
-	}
-}
-
-bool mmapInit(size_t size, BUFFER* &map, int &fd)
-{     
-    printf("File: %s\n", MMAP_PATH);
-    fd = open(MMAP_PATH, O_RDONLY, (mode_t)0600);
-
-    if (fd == -1)
-    {
-            perror("File did not *open* properly");
-            return false;
-    }
-	
-	//struct stat file = {0};
-	//if ( fstat(fd, &file) == -1)
-	//{
-	//	perror("Error collecting the file size.");
-	//	return false;
-	//}
-	//fileSize = file.st_size - 1;
-
-    printf("File size is...%lu bytes\n", size);
-    map = (BUFFER *) mmap( NULL, size, PROT_READ, MAP_SHARED, fd, 0 );
-    if (map == MAP_FAILED)
-    {       
-            perror("mmap failed to open");
-            return false;
-    }
-    printf("[Parent] Map pointer atOPEN = %p\n", (void*)map);
-
-    return true;
-}
-
-bool mmapClose(size_t size, BUFFER* &map, int &fd)
-{
-        printf("[Parent] Map pointer atCLOSE = %p\n", (void*)map);
-        if (munmap(map, size) == -1)
-        {
-                perror("munmap failed");
-                return false;
-        }
-        if (close(fd) == -1)
-        {
-                perror("file did not close");
-                return false;
-        }
-
-        return true;
-}
-
-bool readInTrace(BUFFER* &pinMap, std::vector<trace_entry_t> &result)
-{
+    //need a temp, as readTraceSegment() clears the passed vector
     std::vector<trace_entry_t> temp;
-	BUFFER pinBuf(WORKSPACE_LEN);
+    int index = 0;
 	
 	while ( true )
 	{
-		//Wait until there is something in the buffer to read
+        //Wait until there is something in the cir_buf_t to read
 		printf("waiting to read...\n");
 
-        //-----------------------
-        //Critical Region
-        //-----------------------
-		pinBuf = pinMap[0];
-		if ( pinBuf.read(temp) ) 
-		{
-			pinBuf.clear();
-			pinMap[0] = pinBuf;
-        }
-        //-----------------------
+        //Collect trace segment, with size according to WORKSPACE_SIZE in macro.h
+        tunnel.readTraceSegment(bufferIndex, temp);
+
+        /*
+         * IS THIS CLEARED RIGHT AWAY???
+         */
+        //Clear trace buffer
+        tunnel.clearBuffer(bufferIndex);
 		
 		printf("Adding vector to result of %lu elements\n", temp.size());
 
 		//Add temp to result vector
-		int index = 0;
 		for (int i = 0; i < temp.size(); i++)
 		{
 			if ( temp[i] == END_OF_TRACE )
@@ -269,6 +172,48 @@ bool readInTrace(BUFFER* &pinMap, std::vector<trace_entry_t> &result)
 	return false;
 }
 
+void printVector(std::vector<intptr_t> &src)
+{
+    for (int i = 0; i < src.size(); i++)
+    {
+        std::cout << "[" << i << "]: " << src[i] << std::endl;
+    }
+}
+
+bool pinCallFini(pid_t &pid, int &status, int &timeout, int argc, const char **argv)
+{
+    timeout = 1000;
+    while (0 == waitpid(pid, &status, WNOHANG))
+    {
+        if (--timeout < 0)
+        {
+            perror("Timeout...");
+            return false;
+        }
+        sleep(1);
+    }
+
+    std::cout << std::endl << "Fork() Summary:" << std::endl;
+    for (int i = 0; i < argc; i++)
+    {
+        std::cout << "argv[" << i << "]= " << argv[i] << std::endl;
+    }
+    std::cout << "ExitStatus=" << WEXITSTATUS(status);
+    std::cout << " WIFEXITED=" << WIFEXITED(status) << " Status=";
+    std::cout << status << std::endl;
+
+    if (0 != WEXITSTATUS(status) || 1 != WIFEXITED(status))
+    {
+        perror("Call failed");
+        return false;
+    }
+    return true;
+}
+
+
+/*
+ * Cache Sim Functions
+ */
 void initSimData(std::vector<intptr_t> &cache_vector)
 {
         // Variables

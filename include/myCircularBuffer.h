@@ -2,7 +2,7 @@
 #ifndef SST_CORE_INTERPROCESS_CIRCULARBUFFER_H
 #define SST_CORE_INTERPROCESS_CIRCULARBUFFER_H
 
-#include "sstmutex.h"
+#include <sstmutex.h>
 #include <queue>
 #include <vector>
 
@@ -13,6 +13,14 @@ namespace Interprocess {
 template <typename T>
 class CircularBuffer {
 
+private:
+    SSTMutex bufferMutex;
+    size_t buffSize;
+    size_t readIndex;
+    size_t writeIndex;
+    T buffer[0];
+
+
 public:
 	CircularBuffer(size_t mSize = 0) {
 		buffSize = mSize;
@@ -20,16 +28,17 @@ public:
 		writeIndex = 0;
 	}
 
-	void setBufferSize(const size_t bufferSize)
-    	{
-        	if ( buffSize != 0 ) {
+    void setBufferLength(const size_t bufferLength)
+    {
+        if ( buffSize != 0 )
+        {
 	            fprintf(stderr, "Already specified size for buffer\n");
         	    exit(1);
-        	}
+        }
 
-	        buffSize = bufferSize;
-		__sync_synchronize();
-    	}
+        buffSize = bufferLength;
+        __sync_synchronize();
+    }
 
 	//Read buffer->result vector after clearing result vector
 	bool read(std::vector<T> &result) 
@@ -47,7 +56,7 @@ public:
 
 			if (readIndex == writeIndex)
 			{
-				printf("Inside [r]check #1\n");
+                //printf("Inside [r]check #1\n");
 				bufferMutex.unlock();
 				bufferMutex.processorPause(loop_counter++);
 				
@@ -60,8 +69,8 @@ public:
 				//Mark the end last section being read
 				if ( buffer[readIndex] == 0 )
 				{
-					printf("Found a 0!\n");
-                    //result.push_back(END_OF_TRACE);
+                    printf("The end has been reached...\n");
+                    result.push_back(-7777);
 					bufferMutex.unlock();
 					return true;
 				}
@@ -78,9 +87,12 @@ public:
 		}
 	}
 
+    //NEED TO EDIT
 	bool readNB(T* result) {
-		if( bufferMutex.try_lock() ) {
-			if( readIndex != writeIndex ) {
+        if( bufferMutex.try_lock() )
+        {
+            if( readIndex != writeIndex )
+            {
 				*result = buffer[readIndex];
 				readIndex = (readIndex + 1) % buffSize;
 
@@ -95,6 +107,7 @@ public:
 	}
 
 	//modify so write() takes a CONST
+    //Takes a queue, and empties it while transferring to buffer
 	int write(std::queue<T> &v) 	
 	{
 		int loop_counter = 0;
@@ -146,19 +159,13 @@ public:
 
 	}
 
-	void clear() {
+    void clearBuffer() {
 		bufferMutex.lock();
 		readIndex = writeIndex;
 		__sync_synchronize();
 		bufferMutex.unlock();
 	}
 
-private:
-	SSTMutex bufferMutex;
-	size_t buffSize;
-	size_t readIndex;
-	size_t writeIndex;
-	T buffer[0];
 
 };
 

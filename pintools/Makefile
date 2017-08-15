@@ -1,10 +1,10 @@
-PIN_ROOT = $(HOME)/install/pin-3.2-81205-clang-mac
 SST_CORE = $(HOME)/install/sstcore-7.1.0
+PIN_ROOT = $(HOME)/install/pin-3.2-81205-clang-mac
 PROG_ROOT = $(HOME)/Desktop/workflowProject
 
 PINTOOL_NAME = traceTest
 
-CC := clang
+CC := g++
 
 INCLUDES := \
   -I$(PIN_ROOT)/source/include/pin \
@@ -33,6 +33,7 @@ CPPFLAGS := \
   -D__DARWIN_UNIX03=0
 
 CXXFLAGS := \
+  -std=c++14 \
   -fPIC \
   -fno-stack-protector \
   -fno-exceptions \
@@ -69,7 +70,7 @@ SOURCE=$(PROG_ROOT)/pintools/$(PINTOOL_NAME).cpp
 OBJECT=$(SOURCE:.cpp=.o)
 
 %.o : %.cpp
-	$(CC) $(INCLUDES) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $<
+	$(CC) $(INCLUDES) $(CPPFLAGS) $(CXXFLAGS) -c -o $@ $^ 
 
 $(TARGET): $(OBJECT) $(PIN_ROOT)/intel64/runtime/pincrt/crtbeginS.o
 	$(CC) -shared -o $@ $+ $(INCLUDES) $(LDFLAGS) $(LIBS)
