@@ -3,11 +3,9 @@
 
 #include <myCircularBuffer.h>
 
-using namespace SST::Core::Interprocess;
-
 //typedef intptr_t trace_entry_t; //98
 using trace_entry_t = intptr_t; //11
-using cir_buf_t = CircularBuffer<trace_entry_t>;
+using cir_buf_t = SST::Core::Interprocess::CircularBuffer<trace_entry_t>;
 
 //static const int END_OF_TRACE = -7777;
 constexpr trace_entry_t const END_OF_TRACE = -7777;

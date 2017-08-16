@@ -95,8 +95,9 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
 	int timeout;
 
     //Make sure initial tunnel exists
-    //PinTunnel<trace_entry_t> traceTunnel(NUM_OF_BUFFERS, WORKSPACE_LEN, 1);
-	
+    PinTunnel<trace_entry_t> traceTunnel(NUM_OF_BUFFERS, WORKSPACE_LEN, 1);
+    printf("PinTunnel Created!!!\n");
+
 	pid = fork();
 	if (pid < 0)
 	{
@@ -108,6 +109,7 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
 		//-----------------------
 		// Child Process
 		//-----------------------
+        printf("Before PIN call...\n");
 		if ( execve(argv[0], (char **)argv, nullptr) )
 		{
 			perror("Error: Program failed to execute");

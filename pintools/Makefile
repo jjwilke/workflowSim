@@ -11,6 +11,7 @@ INCLUDES := \
   -I$(PIN_ROOT)/source/include/pin/gen \
   -I$(PIN_ROOT)/extras/components/include \
   -I$(PIN_ROOT)/extras/xed-intel64/include/xed \
+  -I$(PIN_ROOT)/extras/stlport/include \
   -I$(PIN_ROOT)/source/tools/InstLib \
   -I$(PIN_ROOT)/extras/crt/include \
   -I$(SST_CORE)/include/sst/core/interprocess \
@@ -33,7 +34,7 @@ CPPFLAGS := \
   -D__DARWIN_UNIX03=0
 
 CXXFLAGS := \
-  -std=c++14 \
+  -std=c++11 \
   -fPIC \
   -fno-stack-protector \
   -fno-exceptions \

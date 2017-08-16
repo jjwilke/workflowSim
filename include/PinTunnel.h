@@ -138,16 +138,18 @@ public:
     /**
      * Constructor
      * Access an existing Tunnel
-     *
-     * @param region_name Name of the shared-memory region to access
      */
     PinTunnel() : master(false), shmPtr(NULL), fd(-1)
     {
+        printf("IN PinTunnel()_____\n");
+
         filename = MMAP_PATH;
         fd = open(filename, O_RDWR, 0600);
         if ( fd < 0 ) {
             // Not using Output because IPC means Output might not be available
-            fprintf(stderr, "Failed to open IPC region '%s': %s\n",
+//            fprintf(stderr, "Failed to open file '%s': %s\n",
+//                    filename, strerror(errno));
+            printf("Failed to open IPC region '%s': %s\n",
                     filename, strerror(errno));
             exit(1);
         }
@@ -155,23 +157,32 @@ public:
         shmPtr = mmap(NULL, sizeof(ProtectedSharedData), PROT_READ, MAP_SHARED, fd, 0);
         if ( shmPtr == MAP_FAILED ) {
             // Not using Output because IPC means Output might not be available
-            fprintf(stderr, "mmap 0 failed: %s\n", strerror(errno));
+//            fprintf(stderr, "mmap 0 failed: %s\n", strerror(errno));
+            printf("MMAP 0 failed: %s\n", strerror(errno));
             exit(1);
         }
 
         psd = (ProtectedSharedData*)shmPtr;
         shmSize = psd->shmSegSize;
-        munmap(shmPtr, sizeof(ProtectedSharedData));
+        printf("Before munmap()_____\n");
+        if ( munmap(shmPtr, sizeof(ProtectedSharedData)) == -1 )
+        {
+            printf("MUNMAP 0 failed\n");
+            //exit(1);
+        }
 
+        printf("Before mmap2()_____\n");
         shmPtr = mmap(NULL, shmSize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         if ( shmPtr == MAP_FAILED ) {
             // Not using Output because IPC means Output might not be available
-            fprintf(stderr, "mmap 1 failed: %s\n", strerror(errno));
+//            fprintf(stderr, "mmap 1 failed: %s\n", strerror(errno));
+            printf("MMAP 1 failed: %s\n", strerror(errno));
             exit(1);
         }
         psd = (ProtectedSharedData*)shmPtr;
         sharedData = (SharedDataType*)((uint8_t*)shmPtr + psd->offsets[0]);
 
+        printf("Before forLoop()_____\n");
         for ( size_t c = 0 ; c < psd->numBuffers ; c++ ) {
             circBuffs.push_back((cir_buf_t*)((uint8_t*)shmPtr + psd->offsets[c+1]));
         }
@@ -179,6 +190,7 @@ public:
         /* Clean up if we're the last to attach */
         if ( --psd->expectedChildren == 0 ) {
             close(fd);
+            printf("MMAP file closed... <------------------FIX!!!!!!!!!!!\n");
             //shm_unlink(filename);
         }
     }

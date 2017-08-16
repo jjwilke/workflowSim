@@ -2,7 +2,7 @@
 #ifndef SST_CORE_INTERPROCESS_CIRCULARBUFFER_H
 #define SST_CORE_INTERPROCESS_CIRCULARBUFFER_H
 
-#include <sstmutex.h>
+#include <mySSTMutex.h>
 #include <queue>
 #include <vector>
 
@@ -44,46 +44,46 @@ public:
 	bool read(std::vector<T> &result) 
 	{
 		int loop_counter = 0;
-		bool notReady = true;
+        bool empty = true;
+        bool atEndOfTrace = false;
+
+        //Make sure the collection vector is empty
 		result.clear();
 
 		while( true ) 
-		{
-			bufferMutex.lock();
+        {
 			//printf("Loop counter value = %d\n", loop_counter);
 			//printf(" readIndex = %lu\n", readIndex);
 			//printf("writeIndex = %lu\n", writeIndex);
+            empty = (readIndex == writeIndex);
 
-			if (readIndex == writeIndex)
+            if ( empty )
 			{
+                lockGuard g(bufferMutex);
+
                 //printf("Inside [r]check #1\n");
-				bufferMutex.unlock();
 				bufferMutex.processorPause(loop_counter++);
-				
 				continue;
 			}
 
 			printf("Reading data...\n");
-			while( readIndex != writeIndex ) 
-			{
-				//Mark the end last section being read
-				if ( buffer[readIndex] == 0 )
-				{
-                    printf("The end has been reached...\n");
-                    result.push_back(-7777);
-					bufferMutex.unlock();
-					return true;
-				}
+            do
+            {
+                lockGuard g(bufferMutex);
 
-				if ( buffer[readIndex] != 0 )
-				{
-					result.push_back( buffer[readIndex] );
-				}				
+                //Checks
+                empty = (readIndex == writeIndex);
+                atEndOfTrace = (buffer[readIndex] == 0);
+
+                //Add data to vector and update readIndex
+                result.push_back( buffer[readIndex] );
 				readIndex = (readIndex + 1) % buffSize;	
-			}
-			
-			bufferMutex.unlock();		
-			return true;
+            } while ( !empty && !atEndOfTrace );
+
+            printf("The end has been reached...*dramatic music*...\n");
+            //Mark the end last section being read
+            result.push_back(-7777);
+            return true;
 		}
 	}
 
@@ -108,58 +108,64 @@ public:
 
 	//modify so write() takes a CONST
     //Takes a queue, and empties it while transferring to buffer
-	int write(std::queue<T> &v) 	
+    int write(std::queue<T> &src)
 	{
 		int loop_counter = 0;
-		int T_count = 0;
+        int item_count = 0;
+        bool full = false;
 
 		printf("<<< 1 >>>\n");	
 		while( true ) 
 		{
-			printf("Inside [w]check #1\n");
-			bufferMutex.lock();
-			
-			if ( ((writeIndex + 1) % buffSize) == readIndex )
+            printf("Before full(1) [w]check #1\n");
+            printf("writeIndex = %lu\n", writeIndex); //seg fault HERE w/ access of variables
+            printf(" readIndex = %lu\n", readIndex);
+            printf("  buffSize = %lu\n", buffSize);
+            full = ( (writeIndex + 1) % buffSize ) == readIndex;
+
+            printf("Inside [w]check #1\n");
+            if ( full )
 			{
-				printf("Inside [w]check #2\n");
-				
-				bufferMutex.unlock();
-				bufferMutex.processorPause(loop_counter++);
-				
+                lockGuard g(bufferMutex);
+
+                printf("Inside [w]check #2\n");
+                bufferMutex.processorPause(loop_counter++);
 				return 0;
 			}
 			
 			printf("writing data...\n");
-			while ( ((writeIndex + 1) % buffSize) != readIndex ) 
+            while ( !full )
 			{
-				if (!v.empty())
+                lockGuard g(bufferMutex);
+
+                full = ( (writeIndex + 1) % buffSize ) == readIndex;
+
+                if ( !src.empty() )
 				{
-					buffer[writeIndex] = v.front();
-					v.pop();
+                    buffer[writeIndex] = src.front();
+                    src.pop();
 				}
 				else
 				{
 					buffer[writeIndex] = 0;
 				}
 				writeIndex = (writeIndex + 1) % buffSize;
-				T_count++;
+                item_count++;
+
+                __sync_synchronize();
 			}
 			
 			printf("Write index = %lu\n", writeIndex);
 			printf(" Read index = %lu\n", readIndex);
-
-			__sync_synchronize();
-			bufferMutex.unlock();
 		
-			return T_count;
+            return item_count;
 		}
 	}
 
-	~CircularBuffer() {
+    ~CircularBuffer() {}
 
-	}
-
-    void clearBuffer() {
+    void clearBuffer()
+    {
 		bufferMutex.lock();
 		readIndex = writeIndex;
 		__sync_synchronize();
