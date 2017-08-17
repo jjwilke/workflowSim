@@ -12,6 +12,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <typeinfo>
+
 #include <macros.h>
 #include <myCircularBuffer.h>
 
@@ -46,6 +48,8 @@ private:
     ProtectedSharedData *psd;
     std::vector<cir_buf_t *> circBuffs;
 
+
+    //ERROR HERE!!! Not building the circular buffer as it should.
     template <typename T>
     std::pair<size_t, T*> reserveSpace(size_t extraSpace = 0)
     {
@@ -58,6 +62,8 @@ private:
         auto spaceToNextAlloc = (uint8_t*)ptr - (uint8_t*)shmPtr;
         return std::make_pair(spaceToNextAlloc, ptr);
     }
+
+
 
     size_t static calculateShmemSize(size_t numBuffers, size_t bufferLength)
     {
@@ -190,8 +196,6 @@ public:
         /* Clean up if we're the last to attach */
         if ( --psd->expectedChildren == 0 ) {
             close(fd);
-            printf("MMAP file closed... <------------------FIX!!!!!!!!!!!\n");
-            //shm_unlink(filename);
         }
     }
 
@@ -231,9 +235,10 @@ public:
     }
 
     /** Writes a queue of traces to buffer. Blocks until space is available. **/
-    int writeTraceSegment(size_t core, std::queue<trace_entry_t> &traceSegment)
+    int writeTraceSegment(size_t buffer, std::queue<trace_entry_t> &traceSegment)
     {
-        return circBuffs[core]->write(traceSegment);
+        printf("[PinTunnel.h] writeIndex = %zu\n", circBuffs[buffer]->getBufferLength());
+        return circBuffs[buffer]->write(traceSegment);
     }
 
     /** Returns a  Blocks until a command is available **/
@@ -253,9 +258,9 @@ public:
     }
 
     /** Empty the messages in the buffer **/
-    void clearBuffer(size_t core)
+    void clearBuffer(size_t buffer)
     {
-       circBuffs[core]->clearBuffer();
+       circBuffs[buffer]->clearBuffer();
     }
 
 };

@@ -6,6 +6,8 @@
 #include <queue>
 #include <vector>
 
+
+
 namespace SST {
 namespace Core {
 namespace Interprocess {
@@ -27,6 +29,11 @@ public:
 		readIndex = 0;
 		writeIndex = 0;
 	}
+
+    size_t getBufferLength()
+    {
+        return buffSize;
+    }
 
     void setBufferLength(const size_t bufferLength)
     {
@@ -117,10 +124,8 @@ public:
 		printf("<<< 1 >>>\n");	
 		while( true ) 
 		{
+            printf("writeIndex = %zu\n", writeIndex);
             printf("Before full(1) [w]check #1\n");
-            printf("writeIndex = %lu\n", writeIndex); //seg fault HERE w/ access of variables
-            printf(" readIndex = %lu\n", readIndex);
-            printf("  buffSize = %lu\n", buffSize);
             full = ( (writeIndex + 1) % buffSize ) == readIndex;
 
             printf("Inside [w]check #1\n");
@@ -135,7 +140,7 @@ public:
 			
 			printf("writing data...\n");
             while ( !full )
-			{
+            {
                 lockGuard g(bufferMutex);
 
                 full = ( (writeIndex + 1) % buffSize ) == readIndex;
@@ -155,8 +160,7 @@ public:
                 __sync_synchronize();
 			}
 			
-			printf("Write index = %lu\n", writeIndex);
-			printf(" Read index = %lu\n", readIndex);
+            printf("Item count = %d\n", item_count);
 		
             return item_count;
 		}

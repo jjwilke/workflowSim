@@ -51,12 +51,13 @@ int main (int argc, char** argv)
     std::string pintool = "traceTest.dylib";
     std::string progToTrace = "forkTest";
 
+    //std::string lldb = "lldb";
 	std::string pinOptions = "-t";
 	std::string pintoolCall = "bin/" + pintool;
     std::string progCall = "bin/" + progToTrace;
 
 	// Pin call
-	int my_argc = 5;
+    int my_argc = 5;
     const char *programCall[100] = {pinCall.c_str(), pinOptions.c_str(),
 					pintoolCall.c_str(), "--", progCall.c_str(), 
                     nullptr};

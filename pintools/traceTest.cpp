@@ -20,11 +20,17 @@ void Instruction( INS ins, void *v );
 void Fini( INT32 code, void *v );
 bool bufferCheckAndClear();
 bool bufferTransfer();
+INT32 Usage();
+static bool signalHandler(unsigned int tid, int sig, LEVEL_VM::CONTEXT *ctx, bool hasHandler,
+                          const LEVEL_BASE::EXCEPTION_INFO *exceptInfo, void *);
 
 
 int main( int argc, char *argv[] )
 {
-	PIN_Init(argc, argv);
+    if ( PIN_Init(argc, argv) ) { return Usage(); }
+
+    LEVEL_PINCLIENT::PIN_InterceptSignal(SIGSEGV,
+                                         signalHandler, nullptr);
 
     PinTunnel<trace_entry_t> temp; //THIS LINE as a global causes PIN to fail...
     tunnel = &temp;
@@ -32,9 +38,9 @@ int main( int argc, char *argv[] )
     printf("Before INS_AddInstrumentFunction()_____\n");
 
 	INS_AddInstrumentFunction(Instruction, 0);
+
 	PIN_AddFiniFunction(Fini, 0);
 
-	
 	// Never returns
 	PIN_StartProgram();
 
@@ -92,6 +98,13 @@ void Instruction( INS ins, void *v)
 	}
 }
 
+INT32 Usage()
+{
+    std::cerr << "Effective address trace to sstmutex buffer" << std::endl;
+    cerr << endl << KNOB_BASE::StringKnobSummary() << endl;
+    return -1;
+}
+
 void Fini( INT32 code, void *v )
 {
 	//One last transfer to clear up any straglers
@@ -101,11 +114,21 @@ void Fini( INT32 code, void *v )
 	printf("\nPIN is finished...goodbye...\n");
 }
 
+static bool signalHandler(unsigned int tid, int sig, LEVEL_VM::CONTEXT *ctx, bool hasHandler,
+                          const LEVEL_BASE::EXCEPTION_INFO *exceptInfo, void *)
+{
+    printf("Process[%d] Thread[%d] recieved signal %d\n...waiting...\n", getpid(), tid, sig);
+    sleep(10);
+
+    exit(0);
+    return true;
+}
+
 
 //Additional Functions
 bool bufferCheckAndClear()
 {
-    if ( icount < (WORKSPACE_LEN-1) )
+    if ( icount < (WORKSPACE_LEN) )
     {
         return false;
     }
