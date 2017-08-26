@@ -1,8 +1,7 @@
-SST_CORE = $(HOME)/install/sstcore-7.1.0
 PIN_ROOT = $(HOME)/install/pin-3.2-81205-clang-mac
 PROG_ROOT = $(HOME)/Desktop/workflowProject
 
-PINTOOL_NAME = traceTest
+PINTOOL_NAME = traceTool
 
 CC := g++
 
@@ -14,7 +13,6 @@ INCLUDES := \
   -I$(PIN_ROOT)/extras/stlport/include \
   -I$(PIN_ROOT)/source/tools/InstLib \
   -I$(PIN_ROOT)/extras/crt/include \
-  -I$(SST_CORE)/include/sst/core/interprocess \
   -I$(PROG_ROOT)/include
 
 CPPFLAGS := \
@@ -54,8 +52,6 @@ LDFLAGS := \
 
 LIBS := \
   -lpin \
-  -lblas \
-  -llapack\
   -lxed \
   -nostdlib \
   -lpin3dwarf \

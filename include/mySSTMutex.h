@@ -1,12 +1,9 @@
-#ifndef _H_SST_CORE_INTERPROCESS_MUTEX
-#define _H_SST_CORE_INTERPROCESS_MUTEX
+#ifndef MY_MUTEX_H
+#define MY_MUTEX_H
 
 #include <sched.h>
 #include <time.h>
 
-namespace SST {
-namespace Core {
-namespace Interprocess {
 
 #define SST_CORE_INTERPROCESS_LOCKED 1
 #define SST_CORE_INTERPROCESS_UNLOCKED 0
@@ -82,8 +79,5 @@ private:
 
 };
 
-}
-}
-}
 
 #endif

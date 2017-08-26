@@ -1,5 +1,5 @@
-#ifndef MYIPCTUNNEL_H
-#define MYIPCTUNNEL_H
+#ifndef MY_IPCTUNNEL_H
+#define MY_IPCTUNNEL_H
 
 #include <fcntl.h>
 #include <cstdio>
@@ -12,10 +12,9 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include <typeinfo>
+#include <typeinfo> //remove
 
 #include <macros.h>
-#include <myCircularBuffer.h>
 
 /**
  * Tunneling class between two processes, connected by shared memory.
@@ -49,7 +48,6 @@ private:
     std::vector<cir_buf_t *> circBuffs;
 
 
-    //ERROR HERE!!! Not building the circular buffer as it should.
     template <typename T>
     std::pair<size_t, T*> reserveSpace(size_t extraSpace = 0)
     {
@@ -63,6 +61,20 @@ private:
         return std::make_pair(spaceToNextAlloc, ptr);
     }
 
+
+    std::pair<size_t, cir_buf_t*> reserveSpaceCB(size_t cirBufLen = 0)
+    {
+        size_t space = sizeof(cir_buf_t) + cirBufLen;
+        if ( ((nextAllocPtr + space) - (uint8_t*)shmPtr) > shmSize )
+            return std::make_pair<size_t, cir_buf_t*>(0, NULL);
+        cir_buf_t* ptr = (cir_buf_t*)nextAllocPtr;
+        nextAllocPtr += space;
+
+        CircularBuffer<trace_entry_t> temp(cirBufLen);  // Call constructor if need be. ERROR HERE!
+        ptr = &temp;
+        auto spaceToNextAlloc = (uint8_t*)ptr - (uint8_t*)shmPtr;
+        return std::make_pair(spaceToNextAlloc, ptr);
+    }
 
 
     size_t static calculateShmemSize(size_t numBuffers, size_t bufferLength)
@@ -93,7 +105,7 @@ public:
         fd = open(filename, O_RDWR|O_CREAT, 0600);
         if ( fd < 0 ) {
             // Not using Output because IPC means Output might not be available
-            fprintf(stderr, "Failed to create IPC region '%s': %s\n", filename, strerror(errno));
+            fprintf(stderr, "Failed to create IPC region '%s': %s\nCheck path in 'macros.h'\n", filename, strerror(errno));
             exit(1);
         }
 
@@ -110,6 +122,7 @@ public:
             fprintf(stderr, "mmap failed: %s\n", strerror(errno));
             exit(1);
         }
+        printf("    -->MMAP address [PARENT] = %p\n", (void*)&shmPtr);
         nextAllocPtr = (uint8_t*)shmPtr;
         memset(shmPtr, '\0', shmSize);
 
@@ -132,10 +145,10 @@ public:
         {
             cir_buf_t* cPtr = NULL;
 
-            auto resResult = reserveSpace<cir_buf_t>(cbSize);
+            auto resResult = reserveSpaceCB(cbSize);
             psd->offsets[1+c] = resResult.first;
             cPtr = resResult.second;
-            cPtr->setBufferLength(bufferLength);
+            //cPtr->setBufferLength(bufferLength);
             circBuffs.push_back(cPtr);
         }
 
@@ -151,17 +164,19 @@ public:
 
         filename = MMAP_PATH;
         fd = open(filename, O_RDWR, 0600);
-        if ( fd < 0 ) {
+        if ( fd < 0 ) 
+        {
             // Not using Output because IPC means Output might not be available
-//            fprintf(stderr, "Failed to open file '%s': %s\n",
-//                    filename, strerror(errno));
+            // fprintf(stderr, "Failed to open file '%s': %s\n",
+            // filename, strerror(errno));
             printf("Failed to open IPC region '%s': %s\n",
                     filename, strerror(errno));
             exit(1);
         }
 
         shmPtr = mmap(NULL, sizeof(ProtectedSharedData), PROT_READ, MAP_SHARED, fd, 0);
-        if ( shmPtr == MAP_FAILED ) {
+        if ( shmPtr == MAP_FAILED ) 
+        {
             // Not using Output because IPC means Output might not be available
 //            fprintf(stderr, "mmap 0 failed: %s\n", strerror(errno));
             printf("MMAP 0 failed: %s\n", strerror(errno));
@@ -179,22 +194,27 @@ public:
 
         printf("Before mmap2()_____\n");
         shmPtr = mmap(NULL, shmSize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-        if ( shmPtr == MAP_FAILED ) {
+        if ( shmPtr == MAP_FAILED ) 
+        {
             // Not using Output because IPC means Output might not be available
 //            fprintf(stderr, "mmap 1 failed: %s\n", strerror(errno));
             printf("MMAP 1 failed: %s\n", strerror(errno));
             exit(1);
         }
+        printf("    -->MMAP address [PIN] = %p\n", (void*)&shmPtr);
         psd = (ProtectedSharedData*)shmPtr;
         sharedData = (SharedDataType*)((uint8_t*)shmPtr + psd->offsets[0]);
 
         printf("Before forLoop()_____\n");
-        for ( size_t c = 0 ; c < psd->numBuffers ; c++ ) {
+        for ( size_t c = 0 ; c < psd->numBuffers ; c++ ) 
+        {
             circBuffs.push_back((cir_buf_t*)((uint8_t*)shmPtr + psd->offsets[c+1]));
         }
 
         /* Clean up if we're the last to attach */
-        if ( --psd->expectedChildren == 0 ) {
+        if ( --psd->expectedChildren == 0 ) 
+        {
+            printf("Closing file...\n");
             close(fd);
         }
     }
@@ -232,6 +252,11 @@ public:
     SharedDataType* getSharedData()
     {
         return sharedData;
+    }
+
+    size_t getTunnelBufferLen(size_t buffer)
+    {
+        return circBuffs[buffer]->getBufferLength();
     }
 
     /** Writes a queue of traces to buffer. Blocks until space is available. **/

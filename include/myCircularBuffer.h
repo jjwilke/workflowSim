@@ -1,16 +1,11 @@
 
-#ifndef SST_CORE_INTERPROCESS_CIRCULARBUFFER_H
-#define SST_CORE_INTERPROCESS_CIRCULARBUFFER_H
+#ifndef MY_CIRCULARBUFFER_H
+#define MY_CIRCULARBUFFER_H
 
 #include <mySSTMutex.h>
 #include <queue>
 #include <vector>
 
-
-
-namespace SST {
-namespace Core {
-namespace Interprocess {
 
 template <typename T>
 class CircularBuffer {
@@ -170,17 +165,13 @@ public:
 
     void clearBuffer()
     {
-		bufferMutex.lock();
+		lockGuard g(bufferMutex);
 		readIndex = writeIndex;
 		__sync_synchronize();
-		bufferMutex.unlock();
 	}
 
 
 };
 
-}
-}
-}
 
 #endif

@@ -14,8 +14,8 @@ UINT64 icount = 0;
 static PinTunnel<trace_entry_t> *tunnel;
 
 //Declarations
-void recordMemRD(void *addr, void *pinTunnel);
-void recordMemWR(void *addr, void *pinTunnel);
+void recordMemRD( void *addr );
+void recordMemWR( void *addr );
 void Instruction( INS ins, void *v );
 void Fini( INT32 code, void *v );
 bool bufferCheckAndClear();
@@ -32,10 +32,11 @@ int main( int argc, char *argv[] )
     LEVEL_PINCLIENT::PIN_InterceptSignal(SIGSEGV,
                                          signalHandler, nullptr);
 
-    PinTunnel<trace_entry_t> temp; //THIS LINE as a global causes PIN to fail...
-    tunnel = &temp;
-    printf("Tunnel address [main] = %p\n", (void*)&tunnel);
-    printf("Before INS_AddInstrumentFunction()_____\n");
+    PinTunnel<trace_entry_t> tunnelInit; //THIS LINE as a global causes PIN to fail...
+    tunnel = &tunnelInit;
+    size_t buffer = 0;
+    printf("Tunnel address [pinMain] = %p\n", (void*)&tunnel);
+    printf("Tunnel buffer size [0] = %zu\n", tunnel->getTunnelBufferLen(buffer) );
 
 	INS_AddInstrumentFunction(Instruction, 0);
 
@@ -50,7 +51,7 @@ int main( int argc, char *argv[] )
 
 
 //Pintool
-void recordMemRD(void *addr, void *pinTunnel)
+void recordMemRD( void *addr )
 {
     if ( bufferCheckAndClear() )
     {
@@ -63,7 +64,7 @@ void recordMemRD(void *addr, void *pinTunnel)
 }
 
 
-void recordMemWR(void *addr, void *pinTunnel)
+void recordMemWR( void *addr )
 {
     if ( bufferCheckAndClear() )
     {
@@ -75,7 +76,7 @@ void recordMemWR(void *addr, void *pinTunnel)
 	//fprintf(trace, "%p\n", addr);
 }
 
-void Instruction( INS ins, void *v)
+void Instruction( INS ins, void *v )
 {	
 	UINT32 memOperands = INS_MemoryOperandCount(ins);
 	

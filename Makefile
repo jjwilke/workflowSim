@@ -1,12 +1,10 @@
 PROG_ROOT = $(HOME)/Desktop/workflowProject
-SST_CORE = $(HOME)/install/sstcore-7.1.0
 PROGRAM_NAME = mmapPinSim
 
 CC := g++
 
 INCLUDES := \
-	-I$(PROG_ROOT)/include \
-	-I$(SST_CORE)/include/sst/core/interprocess
+	-I$(PROG_ROOT)/include
 CXXFLAGS := 
 CPPFLAGS :=
 CFLAGS :=

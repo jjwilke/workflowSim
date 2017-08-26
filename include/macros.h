@@ -1,11 +1,11 @@
-#ifndef MACROS_H_
-#define MACROS_H_
+#ifndef MY_MACROS_H_
+#define MY_MACROS_H_
 
 #include <myCircularBuffer.h>
 
 //typedef intptr_t trace_entry_t; //98
 using trace_entry_t = intptr_t; //11
-using cir_buf_t = SST::Core::Interprocess::CircularBuffer<trace_entry_t>;
+using cir_buf_t = CircularBuffer<trace_entry_t>;
 
 //static const int END_OF_TRACE = -7777;
 constexpr trace_entry_t const END_OF_TRACE = -7777;
@@ -16,10 +16,10 @@ constexpr int const WORKSPACE_LEN = (WORKSPACE_SIZE / TRACE_ENTRY_SIZE);
 constexpr int const CIR_BUF_SIZE = sizeof(cir_buf_t);
 
 #ifndef MMAP_PATH
-    #define MMAP_PATH (const char*)"/Users/gvanmou/Desktop/workflowProject/bin/pinMap.out"
+    #define MMAP_PATH (const char*)"/Users/Garrett/Desktop/workflowProject/bin/pinMap.out"
 #endif
 
 
 
 
-#endif /* MACROS_H_ */
+#endif /* MY_MACROS_H_ */

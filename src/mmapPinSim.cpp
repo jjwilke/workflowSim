@@ -14,8 +14,6 @@
 
 #include <PinTunnel.h>
 
-using namespace SST::Core::Interprocess;
-
 unsigned int HIT_COUNT;
 unsigned int MISS_COUNT;
 
@@ -46,9 +44,9 @@ int main (int argc, char** argv)
 
 	//VARIABLES
 	// To modify
-	std::string home = "/Users/gvanmou"; //would use $HOME, but execve does not read
+	std::string home = "/Users/Garrett"; //would use $HOME, but execve does not read
     std::string pinCall = home + "/install/pin-3.2-81205-clang-mac/pin";
-    std::string pintool = "traceTest.dylib";
+    std::string pintool = "traceTool.dylib";
     std::string progToTrace = "forkTest";
 
     //std::string lldb = "lldb";
@@ -98,6 +96,8 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
     //Make sure initial tunnel exists
     PinTunnel<trace_entry_t> traceTunnel(NUM_OF_BUFFERS, WORKSPACE_LEN, 1);
     printf("PinTunnel Created!!!\n");
+    printf("NUM_OF_BUFFERS = %d\n", NUM_OF_BUFFERS);
+    printf("WORKSPACE_LEN = %d\n", WORKSPACE_LEN);
 
 	pid = fork();
 	if (pid < 0)
