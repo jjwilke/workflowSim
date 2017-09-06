@@ -11,7 +11,8 @@
 //Globals
 std::queue<trace_entry_t> traceData;
 UINT64 icount = 0;
-static PinTunnel<trace_entry_t> *tunnel;
+static PinTunnel *tunnel;
+const size_t buffer = 0;
 
 //Declarations
 void recordMemRD( void *addr );
@@ -32,11 +33,11 @@ int main( int argc, char *argv[] )
     LEVEL_PINCLIENT::PIN_InterceptSignal(SIGSEGV,
                                          signalHandler, nullptr);
 
-    PinTunnel<trace_entry_t> tunnelInit; //THIS LINE as a global causes PIN to fail...
+    PinTunnel tunnelInit; //THIS LINE as a global causes PIN to fail...
     tunnel = &tunnelInit;
-    size_t buffer = 0;
-    printf("Tunnel address [pinMain] = %p\n", (void*)&tunnel);
-    printf("Tunnel buffer size [0] = %zu\n", tunnel->getTunnelBufferLen(buffer) );
+    printf("Tunnel address [pinMain] = %p <-----\n", (void*)&tunnel);
+    printf("Tunnel buffer size (size != 0) = %zu\n", tunnel->getTunnelBufferLen(buffer) );
+    printf("Tunnel buffer readIndex (== 0) = %zu\n", tunnel->getTunnelReadIndex(buffer) );
 
 	INS_AddInstrumentFunction(Instruction, 0);
 
@@ -109,7 +110,7 @@ INT32 Usage()
 void Fini( INT32 code, void *v )
 {
 	//One last transfer to clear up any straglers
-	printf("Before buffer transfer...\n");
+	printf("Before final buffer transfer...\n");
     bufferTransfer();
 
 	printf("\nPIN is finished...goodbye...\n");
@@ -129,6 +130,7 @@ static bool signalHandler(unsigned int tid, int sig, LEVEL_VM::CONTEXT *ctx, boo
 //Additional Functions
 bool bufferCheckAndClear()
 {
+    //printf("IN bufferCheckAndClear()... [%llu]\n", icount);
     if ( icount < (WORKSPACE_LEN) )
     {
         return false;
@@ -141,10 +143,12 @@ bool bufferCheckAndClear()
 bool bufferTransfer()
 {
     //write to buffer
-    printf("\nSize of traceData = %lu\n", traceData.size());
-    printf("Tunnel address [bufferTransfer] = %p\n", (void*)&tunnel);
-    size_t bufferIndex = 0;
-    int transferCount = tunnel->writeTraceSegment(bufferIndex, traceData);
+    printf("IN bufferTransfer()...\n");
+    printf("Tunnel address [bufferTransfer] = %p <-----\n", (void*)&tunnel);
+    printf("Elements to add to buffer = %zu\n", traceData.size() );
+    
+    printf("Tunnel buffer size (size != 0) and again... = %zu\n", tunnel->getTunnelBufferLen(buffer) );
+    int transferCount = tunnel->writeTraceSegment(buffer, traceData);
 
     size_t transferSizeActual = transferCount * sizeof(trace_entry_t);
     printf("Actual number of bytes transferred = %lu\n", transferSizeActual);

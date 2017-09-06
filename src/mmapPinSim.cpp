@@ -24,7 +24,7 @@ bool pinCallFini(pid_t &pid, int &status, int &timeout, int argc, const char **a
 
 //Input data
 void printVector(std::vector<intptr_t> &src);
-bool readInTrace(PinTunnel<trace_entry_t> &tunnel, size_t &bufferIndex, std::vector<trace_entry_t> &data);
+bool readInTrace(PinTunnel &tunnel, size_t &bufferIndex, std::vector<trace_entry_t> &data);
 
 //Cache sim
 void initSimData(std::vector<trace_entry_t> &);
@@ -94,10 +94,12 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
 	int timeout;
 
     //Make sure initial tunnel exists
-    PinTunnel<trace_entry_t> traceTunnel(NUM_OF_BUFFERS, WORKSPACE_LEN, 1);
+    PinTunnel traceTunnel(NUM_OF_BUFFERS, WORKSPACE_LEN, 1);
     printf("PinTunnel Created!!!\n");
     printf("NUM_OF_BUFFERS = %d\n", NUM_OF_BUFFERS);
     printf("WORKSPACE_LEN = %d\n", WORKSPACE_LEN);
+    size_t buffer = 0;
+    printf("traceTunnel buffer size [parent] (size != 0) = %zu\n", traceTunnel.getTunnelBufferLen(buffer) );
 
 	pid = fork();
 	if (pid < 0)
@@ -139,7 +141,7 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
 /*
  * Fork functions
  */
-bool readInTrace(PinTunnel<trace_entry_t> &tunnel, size_t &bufferIndex, std::vector<trace_entry_t> &result)
+bool readInTrace(PinTunnel &tunnel, size_t &bufferIndex, std::vector<trace_entry_t> &result)
 {
     //need a temp, as readTraceSegment() clears the passed vector
     std::vector<trace_entry_t> temp;
@@ -153,9 +155,6 @@ bool readInTrace(PinTunnel<trace_entry_t> &tunnel, size_t &bufferIndex, std::vec
         //Collect trace segment, with size according to WORKSPACE_SIZE in macro.h
         tunnel.readTraceSegment(bufferIndex, temp);
 
-        /*
-         * IS THIS CLEARED RIGHT AWAY???
-         */
         //Clear trace buffer
         tunnel.clearBuffer(bufferIndex);
 		

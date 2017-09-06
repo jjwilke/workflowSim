@@ -30,6 +30,11 @@ public:
         return buffSize;
     }
 
+    size_t getReadIndex()
+    {
+        return readIndex;
+    }
+
     void setBufferLength(const size_t bufferLength)
     {
         if ( buffSize != 0 )

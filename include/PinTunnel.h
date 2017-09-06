@@ -23,19 +23,18 @@
  *
  * @tparam SharedDataType  Type to put in the shared data region
  */
-template<typename SharedDataType>
+//template<typename SharedDataType>
 class PinTunnel {
 
-    struct ProtectedSharedData {
+    struct TunnelData {
         volatile uint32_t expectedChildren;
         size_t shmSegSize;
         size_t numBuffers;
         size_t offsets[0];  // Actual size:  numBuffers + 2
     };
 
-protected:
-    SharedDataType *sharedData;
-
+// protected:
+//     SharedDataType *sharedData;
 
 private:
     bool master;
@@ -44,7 +43,7 @@ private:
     void *shmPtr;
     uint8_t *nextAllocPtr;
     size_t shmSize;
-    ProtectedSharedData *psd;
+    TunnelData *td;
     std::vector<cir_buf_t *> circBuffs;
 
 
@@ -54,41 +53,48 @@ private:
         size_t space = sizeof(T) + extraSpace;
         if ( ((nextAllocPtr + space) - (uint8_t*)shmPtr) > shmSize )
             return std::make_pair<size_t, T*>(0, NULL);
-        T* ptr = (T*)nextAllocPtr;
+        T *ptr = (T*)nextAllocPtr;
         nextAllocPtr += space;
         new (ptr) T();  // Call constructor if need be
         auto spaceToNextAlloc = (uint8_t*)ptr - (uint8_t*)shmPtr;
         return std::make_pair(spaceToNextAlloc, ptr);
     }
 
-
-    std::pair<size_t, cir_buf_t*> reserveSpaceCB(size_t cirBufLen = 0)
-    {
-        size_t space = sizeof(cir_buf_t) + cirBufLen;
-        if ( ((nextAllocPtr + space) - (uint8_t*)shmPtr) > shmSize )
-            return std::make_pair<size_t, cir_buf_t*>(0, NULL);
-        cir_buf_t* ptr = (cir_buf_t*)nextAllocPtr;
-        nextAllocPtr += space;
-
-        CircularBuffer<trace_entry_t> temp(cirBufLen);  // Call constructor if need be. ERROR HERE!
-        ptr = &temp;
-        auto spaceToNextAlloc = (uint8_t*)ptr - (uint8_t*)shmPtr;
-        return std::make_pair(spaceToNextAlloc, ptr);
-    }
-
-
-    size_t static calculateShmemSize(size_t numBuffers, size_t bufferLength)
+    size_t static calculateShmemSize(size_t numOfBuffers, size_t bufferLength)
     {
         long page_size = sysconf(_SC_PAGESIZE);
 
         /* Count how many pages are needed, at minimum */
-        size_t psd = 1 + ((sizeof(ProtectedSharedData) + (1+numBuffers)*sizeof(size_t)) / page_size);
+        size_t td = 1 + ((sizeof(TunnelData) + (1+numOfBuffers)*sizeof(size_t)) / page_size);
         size_t buffer = 1 + ( (CIR_BUF_SIZE + (bufferLength*TRACE_ENTRY_SIZE)) / page_size );
-        size_t shdata = 1 + ( (sizeof(SharedDataType) + sizeof(ProtectedSharedData)) / page_size );
+        //size_t shdata = 1 + ( sizeof(TunnelData) / page_size );
 
         /* Alloc 2 extra pages, just in case */
-        return (2 + psd + shdata + numBuffers*buffer) * page_size;
+        return ( 2 + td + (numOfBuffers*buffer) ) * page_size;
     }
+
+    // size_t getShmSegSize()
+    // {
+    //     shmPtr = mmap(NULL, sizeof(TunnelData), PROT_READ, MAP_SHARED, fd, 0);
+    //     if ( shmPtr == MAP_FAILED ) 
+    //     {
+    //         // Not using Output because IPC means Output might not be available
+    //         // fprintf(stderr, "mmap 0 failed: %s\n", strerror(errno));
+    //         printf("MMAP 0 failed: %s\n", strerror(errno));
+    //         exit(1);
+    //     }
+
+    //     td = (TunnelData*)shmPtr;
+    //     size_t result = td->shmSegSize;
+    //     printf("shmSize2 [getShmSegSize() 2nd] = %zu\n", shmSize);
+    //     if ( munmap(shmPtr, sizeof(TunnelData)) == -1 )
+    //     {
+    //         printf("MUNMAP 0 failed\n");
+    //         //exit(1);
+    //     }
+
+    //     return result;
+    // }
 
 
 public:
@@ -102,7 +108,7 @@ public:
     PinTunnel(size_t numBuffers, size_t bufferLength, uint32_t expectedChildren = 1) : master(true), shmPtr(NULL), fd(-1)
     {
         filename = MMAP_PATH;
-        fd = open(filename, O_RDWR|O_CREAT, 0600);
+        fd = open(filename, O_RDWR|O_CREAT, 0660);
         if ( fd < 0 ) {
             // Not using Output because IPC means Output might not be available
             fprintf(stderr, "Failed to create IPC region '%s': %s\nCheck path in 'macros.h'\n", filename, strerror(errno));
@@ -110,6 +116,7 @@ public:
         }
 
         shmSize = calculateShmemSize(numBuffers, bufferLength);
+        printf("shmSize1 [PinTunnel() 1st] = %zu\n", shmSize);
         if ( ftruncate(fd, shmSize) ) {
             // Not using Output because IPC means Output might not be available
             fprintf(stderr, "Resizing shared file '%s' failed: %s\n", filename, strerror(errno));
@@ -128,27 +135,30 @@ public:
 
         /* Construct our private buffer first.  Used for our communications */
         auto commBufSize = (1+numBuffers)*sizeof(size_t);
-        auto resResult = reserveSpace<ProtectedSharedData>(commBufSize);
-        psd = resResult.second;
-        psd->expectedChildren = expectedChildren;
-        psd->shmSegSize = shmSize;
-        psd->numBuffers = numBuffers;
+        auto resResult = reserveSpace<TunnelData>(commBufSize);
+        td = resResult.second;
+        td->expectedChildren = expectedChildren;
+        td->shmSegSize = shmSize;
+        td->numBuffers = numBuffers;
 
-        /* Construct user's shared-data region */
-        auto shareResult = reserveSpace<SharedDataType>(0);
-        psd->offsets[0] = shareResult.first;
-        sharedData = shareResult.second;
+        // /* Construct user's shared-data region */
+        // auto shareResult = reserveSpace<SharedDataType>(0);
+        // td->offsets[0] = shareResult.first;
+        // sharedData = shareResult.second;
 
         /* Construct the circular buffers */
         const size_t cbSize = TRACE_ENTRY_SIZE * bufferLength;
-        for ( size_t c = 0 ; c < psd->numBuffers ; c++ )
+        for ( size_t c = 0 ; c < td->numBuffers ; c++ )
         {
             cir_buf_t* cPtr = NULL;
 
-            auto resResult = reserveSpaceCB(cbSize);
-            psd->offsets[1+c] = resResult.first;
+            auto resResult = reserveSpace<cir_buf_t>(cbSize);
+            td->offsets[c] = resResult.first;
+
+            printf("td->offsets[c] [PinTunnel() 1st] = %zu\n", td->offsets[c]);
+
             cPtr = resResult.second;
-            //cPtr->setBufferLength(bufferLength);
+            cPtr->setBufferLength(bufferLength);
             circBuffs.push_back(cPtr);
         }
 
@@ -160,10 +170,10 @@ public:
      */
     PinTunnel() : master(false), shmPtr(NULL), fd(-1)
     {
-        printf("IN PinTunnel()_____\n");
+        printf("\nIN PinTunnel()_____\n");
 
         filename = MMAP_PATH;
-        fd = open(filename, O_RDWR, 0600);
+        fd = open(filename, O_RDWR, 0660);
         if ( fd < 0 ) 
         {
             // Not using Output because IPC means Output might not be available
@@ -174,45 +184,54 @@ public:
             exit(1);
         }
 
-        shmPtr = mmap(NULL, sizeof(ProtectedSharedData), PROT_READ, MAP_SHARED, fd, 0);
+        // shmSize = getShmSegSize();
+        //-----------------------
+        // Find shmSize
+        //-----------------------
+        shmPtr = mmap(NULL, sizeof(TunnelData), PROT_READ, MAP_SHARED, fd, 0);
         if ( shmPtr == MAP_FAILED ) 
         {
             // Not using Output because IPC means Output might not be available
-//            fprintf(stderr, "mmap 0 failed: %s\n", strerror(errno));
+            // fprintf(stderr, "mmap 0 failed: %s\n", strerror(errno));
             printf("MMAP 0 failed: %s\n", strerror(errno));
             exit(1);
         }
 
-        psd = (ProtectedSharedData*)shmPtr;
-        shmSize = psd->shmSegSize;
-        printf("Before munmap()_____\n");
-        if ( munmap(shmPtr, sizeof(ProtectedSharedData)) == -1 )
+        td = (TunnelData*)shmPtr;
+        shmSize = td->shmSegSize;
+        printf("shmSize2 [getShmSegSize() 2nd] = %zu\n", shmSize);
+        if ( munmap(shmPtr, sizeof(TunnelData)) == -1 )
         {
             printf("MUNMAP 0 failed\n");
             //exit(1);
         }
 
-        printf("Before mmap2()_____\n");
+        //-----------------------
+        // Map PinTunnel
+        //-----------------------
         shmPtr = mmap(NULL, shmSize, PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
         if ( shmPtr == MAP_FAILED ) 
         {
             // Not using Output because IPC means Output might not be available
-//            fprintf(stderr, "mmap 1 failed: %s\n", strerror(errno));
+            // fprintf(stderr, "mmap 1 failed: %s\n", strerror(errno));
             printf("MMAP 1 failed: %s\n", strerror(errno));
             exit(1);
         }
         printf("    -->MMAP address [PIN] = %p\n", (void*)&shmPtr);
-        psd = (ProtectedSharedData*)shmPtr;
-        sharedData = (SharedDataType*)((uint8_t*)shmPtr + psd->offsets[0]);
+        td = (TunnelData*)shmPtr;
+        //sharedData = (SharedDataType*)((uint8_t*)shmPtr + td->offsets[0]);
 
-        printf("Before forLoop()_____\n");
-        for ( size_t c = 0 ; c < psd->numBuffers ; c++ ) 
+        // PROBLEM HERE!!
+        for ( size_t c = 0 ; c < td->numBuffers ; c++ ) 
         {
-            circBuffs.push_back((cir_buf_t*)((uint8_t*)shmPtr + psd->offsets[c+1]));
+            printf("td->offsets[c] [PinTunnel() 2nd] = %zu\n", td->offsets[c]);
+            cir_buf_t *toAdd = (cir_buf_t*)( (uint8_t*)shmPtr + td->offsets[c] );
+
+            circBuffs.push_back( toAdd );
         }
 
         /* Clean up if we're the last to attach */
-        if ( --psd->expectedChildren == 0 ) 
+        if ( --td->expectedChildren == 0 ) 
         {
             printf("Closing file...\n");
             close(fd);
@@ -248,21 +267,28 @@ public:
         }
     }
 
-    /** return a pointer to the SharedDataType region */
-    SharedDataType* getSharedData()
-    {
-        return sharedData;
-    }
+    // /** return a pointer to the SharedDataType region */
+    // SharedDataType* getSharedData()
+    // {
+    //     return sharedData;
+    // }
 
     size_t getTunnelBufferLen(size_t buffer)
     {
         return circBuffs[buffer]->getBufferLength();
     }
 
+    size_t getTunnelReadIndex(size_t buffer)
+    {
+        return circBuffs[buffer]->getReadIndex();
+    }
+
     /** Writes a queue of traces to buffer. Blocks until space is available. **/
     int writeTraceSegment(size_t buffer, std::queue<trace_entry_t> &traceSegment)
     {
-        printf("[PinTunnel.h] writeIndex = %zu\n", circBuffs[buffer]->getBufferLength());
+        printf("HELLO!!!\n");
+        printf("bufferLength [PinTunnel.h] = %zu\n", getTunnelBufferLen(buffer) );
+
         return circBuffs[buffer]->write(traceSegment);
     }
 
