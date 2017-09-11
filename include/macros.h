@@ -3,12 +3,11 @@
 
 #include <myCircularBuffer.h>
 
-//typedef intptr_t trace_entry_t; //98
-using trace_entry_t = intptr_t; //11
+// typedef intptr_t trace_entry_t; //98
+// using trace_entry_t = intptr_t; //11
 using cir_buf_t = CircularBuffer<trace_entry_t>;
 
-//static const int END_OF_TRACE = -7777;
-constexpr trace_entry_t const END_OF_TRACE = -7777;
+// static const int END_OF_TRACE = -7777;
 constexpr int const NUM_OF_BUFFERS = 1;
 constexpr int const WORKSPACE_SIZE = 7186;
 constexpr int const TRACE_ENTRY_SIZE = sizeof(trace_entry_t);

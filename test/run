@@ -1,0 +1,5 @@
+#! /usr/bin/env bash
+
+echo running test...
+./mmapReadTunnel
+echo run complete

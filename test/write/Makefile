@@ -1,6 +1,6 @@
 PROG_ROOT = $(HOME)/Desktop/workflowProject
 SST_CORE = $(HOME)/install/sstcore-7.1.0
-PROGRAM_NAME = mmapReadTunnel
+PROGRAM_NAME = mmapWriteTunnel
 
 CC := g++
 

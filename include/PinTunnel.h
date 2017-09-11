@@ -66,11 +66,11 @@ private:
 
         /* Count how many pages are needed, at minimum */
         size_t td = 1 + ((sizeof(TunnelData) + (1+numOfBuffers)*sizeof(size_t)) / page_size);
-        size_t buffer = 1 + ( (CIR_BUF_SIZE + (bufferLength*TRACE_ENTRY_SIZE)) / page_size );
+        size_t buffer = 1 + ( (CIR_BUF_SIZE + bufferLength) / page_size );
         //size_t shdata = 1 + ( sizeof(TunnelData) / page_size );
 
-        /* Alloc 2 extra pages, just in case */
-        return ( 2 + td + (numOfBuffers*buffer) ) * page_size;
+        /* NO extra pages */
+        return ( td + (numOfBuffers * buffer) ) * page_size;
     }
 
     // size_t getShmSegSize()
@@ -243,6 +243,7 @@ public:
      */
     virtual ~PinTunnel()
     {
+        //printf("PinTunnel Destructor...\n");
         shutdown(true);
     }
 
@@ -286,9 +287,6 @@ public:
     /** Writes a queue of traces to buffer. Blocks until space is available. **/
     int writeTraceSegment(size_t buffer, std::queue<trace_entry_t> &traceSegment)
     {
-        printf("HELLO!!!\n");
-        printf("bufferLength [PinTunnel.h] = %zu\n", getTunnelBufferLen(buffer) );
-
         return circBuffs[buffer]->write(traceSegment);
     }
 

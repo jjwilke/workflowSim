@@ -1,6 +1,8 @@
-
 #ifndef MY_CIRCULARBUFFER_H
 #define MY_CIRCULARBUFFER_H
+
+using trace_entry_t = intptr_t;
+constexpr trace_entry_t const END_OF_TRACE = -7777;
 
 #include <mySSTMutex.h>
 #include <queue>
@@ -25,35 +27,10 @@ public:
 		writeIndex = 0;
 	}
 
-    size_t getBufferLength()
-    {
-        return buffSize;
-    }
-
-    size_t getReadIndex()
-    {
-        return readIndex;
-    }
-
-    void setBufferLength(const size_t bufferLength)
-    {
-        if ( buffSize != 0 )
-        {
-	            fprintf(stderr, "Already specified size for buffer\n");
-        	    exit(1);
-        }
-
-        buffSize = bufferLength;
-        __sync_synchronize();
-    }
-
 	//Read buffer->result vector after clearing result vector
 	bool read(std::vector<T> &result) 
 	{
-		int loop_counter = 0;
-        bool empty = true;
-        bool atEndOfTrace = false;
-
+        int loop_counter = 0;
         //Make sure the collection vector is empty
 		result.clear();
 
@@ -62,34 +39,28 @@ public:
 			//printf("Loop counter value = %d\n", loop_counter);
 			//printf(" readIndex = %lu\n", readIndex);
 			//printf("writeIndex = %lu\n", writeIndex);
-            empty = (readIndex == writeIndex);
 
-            if ( empty )
+            if ( bufferIsEmpty() )
 			{
                 lockGuard g(bufferMutex);
 
-                //printf("Inside [r]check #1\n");
 				bufferMutex.processorPause(loop_counter++);
 				continue;
 			}
 
-			printf("Reading data...\n");
+			printf("reading data...\n");
             do
             {
                 lockGuard g(bufferMutex);
 
-                //Checks
-                empty = (readIndex == writeIndex);
-                atEndOfTrace = (buffer[readIndex] == 0);
-
                 //Add data to vector and update readIndex
                 result.push_back( buffer[readIndex] );
 				readIndex = (readIndex + 1) % buffSize;	
-            } while ( !empty && !atEndOfTrace );
+            } while ( !bufferIsEmpty() && !atEndOfTrace() );
 
-            printf("The end has been reached...*dramatic music*...\n");
+            printf("The end of read(vector) has been reached...*dramatic music*\n");
             //Mark the end last section being read
-            result.push_back(-7777);
+            //result.push_back(-7777);
             return true;
 		}
 	}
@@ -117,19 +88,15 @@ public:
     //Takes a queue, and empties it while transferring to buffer
     int write(std::queue<T> &src)
 	{
-		int loop_counter = 0;
+        int loop_counter = 0;
         int item_count = 0;
-        bool full = false;
-
-		printf("<<< 1 >>>\n");	
+	
 		while( true ) 
 		{
             printf("writeIndex = %zu\n", writeIndex);
-            printf("Before full(1) [w]check #1\n");
-            full = ( (writeIndex + 1) % buffSize ) == readIndex;
 
             printf("Inside [w]check #1\n");
-            if ( full )
+            if ( bufferIsFull() )
 			{
                 lockGuard g(bufferMutex);
 
@@ -139,41 +106,92 @@ public:
 			}
 			
 			printf("writing data...\n");
-            while ( !full )
+            while ( !bufferIsFull() )
             {
                 lockGuard g(bufferMutex);
-
-                full = ( (writeIndex + 1) % buffSize ) == readIndex;
 
                 if ( !src.empty() )
 				{
                     buffer[writeIndex] = src.front();
                     src.pop();
+                    item_count++;
 				}
+                /*MARK if at end of trace, so read() knows when to stop*/
 				else
 				{
-					buffer[writeIndex] = 0;
+					buffer[writeIndex] = END_OF_TRACE;
+                    return item_count;
 				}
-				writeIndex = (writeIndex + 1) % buffSize;
-                item_count++;
 
+				writeIndex = (writeIndex + 1) % buffSize;
                 __sync_synchronize();
 			}
 			
-            printf("Item count = %d\n", item_count);
-		
+            printf("Items written(queue) = %d\n", item_count);
             return item_count;
 		}
 	}
 
     ~CircularBuffer() {}
 
+    /*
+    * Helper functions
+    */
     void clearBuffer()
     {
 		lockGuard g(bufferMutex);
 		readIndex = writeIndex;
 		__sync_synchronize();
 	}
+
+    bool bufferIsEmpty()
+    {
+        if (readIndex == writeIndex)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    bool bufferIsFull()
+    {
+        if ( ((writeIndex + 1) % buffSize) == readIndex )
+        {
+            return true;
+        }
+        return false;
+    }
+
+    bool atEndOfTrace()
+    {
+        if (buffer[readIndex] == END_OF_TRACE)
+        {
+            return true;
+        }
+        return false;
+    }
+
+    size_t getBufferLength()
+    {
+        return buffSize;
+    }
+
+    size_t getReadIndex()
+    {
+        return readIndex;
+    }
+
+    void setBufferLength(const size_t bufferLength)
+    {
+        if ( buffSize != 0 )
+        {
+                fprintf(stderr, "Already specified size for buffer\n");
+                exit(1);
+        }
+
+        buffSize = bufferLength;
+        __sync_synchronize();
+    }
 
 
 };
