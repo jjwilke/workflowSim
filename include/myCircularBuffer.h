@@ -40,10 +40,14 @@ public:
 			//printf(" readIndex = %lu\n", readIndex);
 			//printf("writeIndex = %lu\n", writeIndex);
 
-            if ( bufferIsEmpty() )
+            if ( !bufferIsFull() )
 			{
-                lockGuard g(bufferMutex);
-
+                bufferMutex.lock(); //Edit once working!!!
+                if (writeIndex - readIndex != 0)
+                {
+                    printf("difference = %lu [read()]\n", writeIndex - readIndex);
+                }
+                bufferMutex.unlock();
 				bufferMutex.processorPause(loop_counter++);
 				continue;
 			}
@@ -56,6 +60,8 @@ public:
                 //Add data to vector and update readIndex
                 result.push_back( buffer[readIndex] );
 				readIndex = (readIndex + 1) % buffSize;	
+
+                printf("!bufferIsEmpty() = %d  |  !atEndOfTrace() = %d\n", !bufferIsEmpty(), !atEndOfTrace());
             } while ( !bufferIsEmpty() && !atEndOfTrace() );
 
             printf("The end of read(vector) has been reached...*dramatic music*\n");
@@ -93,41 +99,53 @@ public:
 	
 		while( true ) 
 		{
-            printf("writeIndex = %zu\n", writeIndex);
+            printf("writeIndex = %zu [write]\n", writeIndex);
+            printf("readIndex = %zu [write]\n", readIndex);
 
-            printf("Inside [w]check #1\n");
             if ( bufferIsFull() )
 			{
                 lockGuard g(bufferMutex);
 
-                printf("Inside [w]check #2\n");
+                //printf("Inside [w]check #2\n");
                 bufferMutex.processorPause(loop_counter++);
 				return 0;
 			}
 			
+            printf("Items in queue = %lu [myCircularBuffer - write()]\n", src.size());
+            //printf("buffSize = %zu [myCircularBuffer]\n", buffSize);
 			printf("writing data...\n");
             while ( !bufferIsFull() )
             {
                 lockGuard g(bufferMutex);
 
-                if ( !src.empty() )
-				{
-                    buffer[writeIndex] = src.front();
-                    src.pop();
+                if ( src.empty() )
+                {
+                    printf("src is EMPTY [myCircularBuffer]\n");
+                    buffer[writeIndex] = END_OF_TRACE;
                     item_count++;
-				}
-                /*MARK if at end of trace, so read() knows when to stop*/
-				else
-				{
-					buffer[writeIndex] = END_OF_TRACE;
-                    return item_count;
-				}
 
-				writeIndex = (writeIndex + 1) % buffSize;
-                __sync_synchronize();
+                    writeIndex = (writeIndex + 1) % (buffSize+1);
+                    __sync_synchronize();
+                    return item_count;
+                }
+
+                //printf("!src.empty = %d\n", !src.empty());
+                buffer[writeIndex] = src.front();
+                src.pop();
+                item_count++;
+
+                printf("[%zu] src.size = %zu [write]\n", writeIndex, src.size());
+                /*MARK if at end of trace, so read() knows when to stop*/
+
+				writeIndex = (writeIndex + 1) % (buffSize+1);
+                //__sync_synchronize();
 			}
 			
-            printf("Items written(queue) = %d\n", item_count);
+            printf("writeIndex = %zu [write]\n", writeIndex);
+            printf("readIndex = %zu [write]\n", readIndex);
+            printf("buffSize+1 = %zu [myCircularBuffer]\n", (buffSize+1));
+            printf("DONE WRITING! Items written = %d [myCircularBuffer]\n", item_count);
+            __sync_synchronize();
             return item_count;
 		}
 	}
@@ -155,7 +173,7 @@ public:
 
     bool bufferIsFull()
     {
-        if ( ((writeIndex + 1) % buffSize) == readIndex )
+        if ( ((writeIndex + 1) % (buffSize+1) == readIndex) )
         {
             return true;
         }

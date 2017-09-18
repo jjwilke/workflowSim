@@ -30,7 +30,7 @@ class PinTunnel {
         volatile uint32_t expectedChildren;
         size_t shmSegSize;
         size_t numBuffers;
-        size_t offsets[0];  // Actual size:  numBuffers + 2
+        size_t offsets[0];
     };
 
 // protected:

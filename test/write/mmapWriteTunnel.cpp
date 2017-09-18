@@ -44,15 +44,16 @@ int main (int argc, char** argv)
             fileData.pop();
         }
 
-        printf("-->[%d] ", i);
+        printf("\n-->[%d] ", i);
+        printf("queue to add length = %lu [mmapWriteTunnel - main]\n", toWrite.size());
         traceTunnel.writeTraceSegment(buffer, toWrite);
-        traceTunnel.clearBuffer(buffer);
+        //traceTunnel.clearBuffer(buffer);
     }
 
     //final write segment
     printf("\nFinal writeTraceSegment.size() = %lu\n", fileData.size());
     traceTunnel.writeTraceSegment(buffer, fileData);
-    traceTunnel.clearBuffer(buffer);
+    //traceTunnel.clearBuffer(buffer);
 
     printf("\nWORKSPACE_LEN = %d\n", WORKSPACE_LEN);
     printf("iterations = %zu\n", iterations);

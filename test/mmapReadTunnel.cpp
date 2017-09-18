@@ -78,6 +78,7 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
     int timeout;
 
     //Make sure initial tunnel exists
+    //int bufferLength = WORKSPACE_LEN + 1;
     PinTunnel traceTunnel(NUM_OF_BUFFERS, WORKSPACE_LEN, 1);
     printf("PinTunnel Created!!!\n");
 
@@ -140,9 +141,10 @@ bool readInTrace(PinTunnel &tunnel, size_t &bufferIndex, std::vector<trace_entry
         *  NEED TO CHANGE BELOW SECTION
         */
         //Add readInData to result vector
-        int iterations = readToResultCount( readInData.size() );
         printf("readInData.size() = %lu\n", readInData.size());
+        int iterations = readToResultCount( readInData.size() );
         printf("iterations = %d\n", iterations);
+
 
         for (int i = 0; i < iterations; i++)
         {
