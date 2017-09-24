@@ -29,6 +29,15 @@ bool readInTrace(PinTunnel &tunnel, size_t &bufferIndex, std::vector<trace_entry
 //Other
 int readToResultCount(int readInDataSize);
 
+//Cache sim
+void initSimData(std::vector<trace_entry_t> &);
+void generateCacheVector(intptr_t, std::vector<trace_entry_t> &, trace_entry_t);
+void directCacheSim(std::vector<trace_entry_t>, std::vector<trace_entry_t>);
+intptr_t findCacheIndex(intptr_t, intptr_t);
+bool NOT_EQUAL(trace_entry_t, trace_entry_t);
+void replaceLineData(intptr_t, std::vector<trace_entry_t> &, intptr_t);
+void directSimResults(unsigned int);
+
 
 //-----------------------
 //Main
@@ -49,22 +58,26 @@ int main (int argc, char** argv)
     bool callSuccess = exeProg(my_argc, programCall, traceData);
     if (callSuccess)
     {
+        bool notDone = true;
+        while ( notDone )
+        {
+            /*
+             * Cache Simulation
+            */
+            // Gather user data for cache
+            std::vector<intptr_t> cache;
+            initSimData(cache);
+            unsigned int cache_size = cache.size();
 
+            // Run simulation
+            HIT_COUNT = 0;
+            MISS_COUNT = 0;
+            directCacheSim(traceData, cache);
+            directSimResults(cache_size);
 
-/*		//-----------------------
-        //cache sim
-        //-----------------------
-        // Gather user data for cache
-        std::vector<intptr_t> cache;
-        initSimData(cache);
-        unsigned int cache_size = cache.size();
-
-        // Run simulation
-        HIT_COUNT = 0;
-        MISS_COUNT = 0;
-        directCacheSim(traceData, cache);
-        directSimResults(cache_size);
-*/
+            printf("Enter '1' to continue and '0' to stop: ");
+            std::cin >> notDone;
+        }
     }
 
     return 0;
@@ -77,10 +90,8 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
     int status;
     int timeout;
 
-    //Make sure initial tunnel exists
-    //int bufferLength = WORKSPACE_LEN + 1;
+    //Create a tunnel for trace addresses
     PinTunnel traceTunnel(NUM_OF_BUFFERS, WORKSPACE_LEN, 1);
-    printf("PinTunnel Created!!!\n");
 
     pid = fork();
     if (pid < 0)
@@ -124,31 +135,22 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
  */
 bool readInTrace(PinTunnel &tunnel, size_t &bufferIndex, std::vector<trace_entry_t> &result)
 {
+    //vector to hold pieces of the pin trace
     std::vector<trace_entry_t> readInData;
 
     while ( true )
     {
-        //Wait until there is something in the cir_buf_t to read
-        printf("waiting to read...\n");
-
         //Collect trace segment, with size according to WORKSPACE_SIZE in macro.h
         //No need to clear readInData before passing it, as it is cleared in read()
         tunnel.readTraceSegment(bufferIndex, readInData);
         //Clear trace buffer
         tunnel.clearBuffer(bufferIndex);
 
-        /*
-        *  NEED TO CHANGE BELOW SECTION
-        */
+        
         //Add readInData to result vector
-        printf("readInData.size() = %lu\n", readInData.size());
-        int iterations = readToResultCount( readInData.size() );
-        printf("iterations = %d\n", iterations);
-
-
-        for (int i = 0; i < iterations; i++)
+        for (int i = 0; i < readInData.size(); i++)
         {
-            // printf("[%d]\n", i);
+            //if at end of trace, stop reading and exit function
             if ( readInData[i] == END_OF_TRACE )
             {
                 return true;
@@ -157,19 +159,6 @@ bool readInTrace(PinTunnel &tunnel, size_t &bufferIndex, std::vector<trace_entry
         }
     }
     return false;
-}
-
-int readToResultCount(int readInDataSize)
-{
-    if (readInDataSize > WORKSPACE_LEN)
-    {
-        return 0;
-    }
-    else if (readInDataSize < WORKSPACE_LEN)
-    {
-        return readInDataSize;
-    }
-    return WORKSPACE_LEN;
 }
 
 void printVector(std::vector<intptr_t> &src)
@@ -208,4 +197,89 @@ bool pinCallFini(pid_t &pid, int &status, int &timeout, int argc, const char **a
         return false;
     }
     return true;
+}
+
+/*
+ * Cache Sim Functions
+ */
+void initSimData(std::vector<intptr_t> &cache_vector)
+{
+        // Variables
+        int words_per_line = 1;
+        int line_size = 8 * words_per_line; //in bytes
+        intptr_t cache_size;
+        intptr_t num_of_lines;
+
+        std::cout << "Input cache size (in bytes): ";
+        std::cin >> cache_size;
+        num_of_lines = cache_size / line_size;
+
+        // Initialize cache vector elements with the third function input
+        generateCacheVector(num_of_lines, cache_vector, 0);
+}
+
+void generateCacheVector(intptr_t numOfLines, std::vector<intptr_t> &src, intptr_t initial_value)
+{
+        for (int i = 0; i < numOfLines; i++)
+        {
+                src.push_back(initial_value);
+        }
+}
+
+void directCacheSim(std::vector<intptr_t> data, std::vector<intptr_t> cache)
+{
+        intptr_t cacheSize = cache.size();
+        for (int i = 0; i < data.size(); i++)
+        {
+                // Fine line to which the data address maps to
+                intptr_t line_index = findCacheIndex(data[i], cacheSize);
+
+                // Report hit or miss
+                if ( NOT_EQUAL(data[i], cache[line_index]) )
+                {
+                        MISS_COUNT++;
+                        replaceLineData(data[i], cache, line_index);
+                }
+                else
+                {
+                        HIT_COUNT++;
+                }
+        }
+
+}
+
+intptr_t findCacheIndex(intptr_t address, intptr_t cache_size)
+{
+        return address % cache_size;
+}
+
+bool NOT_EQUAL(intptr_t a, intptr_t b)
+{
+        if (a != b)
+        {
+                return true;
+        }
+        else
+        {
+                return false;
+        }
+}
+
+void replaceLineData(intptr_t memory_address, std::vector<intptr_t> &cache, intptr_t line_index)
+{
+        cache[line_index] = memory_address;
+}
+
+void directSimResults(unsigned int cacheSize)
+{
+        // Calculations
+        float ratio = (float)HIT_COUNT / (float)MISS_COUNT;
+        unsigned int cacheSizeKiB = (cacheSize*8) / 1024;
+
+        // Results
+        std::cout << "Direct Mapping Simulation Results:" << std::endl;
+        std::cout << "          Cache Size(KiB) = " << cacheSizeKiB << std::endl;
+        std::cout << "                     Hits = " << HIT_COUNT << std::endl;
+        std::cout << "                   Misses = " << MISS_COUNT << std::endl;
+        std::cout << "           Hit/Miss Ratio = " << std::setprecision(5) << ratio << std::endl << std::endl;
 }

@@ -2,7 +2,7 @@
 #define MY_CIRCULARBUFFER_H
 
 using trace_entry_t = intptr_t;
-constexpr trace_entry_t const END_OF_TRACE = -7777;
+constexpr trace_entry_t const END_OF_TRACE = 717171;
 
 #include <mySSTMutex.h>
 #include <queue>
@@ -17,18 +17,28 @@ private:
     size_t buffSize;
     size_t readIndex;
     size_t writeIndex;
+    bool atEndOfTrace; //set to true after last write
     T buffer[0];
 
 
 public:
-	CircularBuffer(size_t mSize = 0) {
+	CircularBuffer(size_t mSize = 0) : atEndOfTrace(false)
+    {
 		buffSize = mSize;
 		readIndex = 0;
 		writeIndex = 0;
 	}
 
-	//Read buffer->result vector after clearing result vector
-	bool read(std::vector<T> &result) 
+	/**
+     * @brief      Reads the buffer data to an output vector
+     *
+     * @param      result  The resulting vector
+     *
+     * @return     A bool indicating a successful read.
+     *              Consider changing to an int that returns
+     *              a count of the items read.   
+     */
+    bool read(std::vector<T> &result) 
 	{
         int loop_counter = 0;
         //Make sure the collection vector is empty
@@ -36,37 +46,31 @@ public:
 
 		while( true ) 
         {
-			//printf("Loop counter value = %d\n", loop_counter);
-			//printf(" readIndex = %lu\n", readIndex);
-			//printf("writeIndex = %lu\n", writeIndex);
-
-            if ( !bufferIsFull() )
+            //wait until the buffer is full, or at the last read
+            while ( !bufferIsFull() )
 			{
-                bufferMutex.lock(); //Edit once working!!!
-                if (writeIndex - readIndex != 0)
+                //if at the last read, the buffer will never be full
+                if ( atEndOfTrace )
                 {
-                    printf("difference = %lu [read()]\n", writeIndex - readIndex);
+                    break;
                 }
-                bufferMutex.unlock();
+
+                //waiting...
+                lockGuard g(bufferMutex);
 				bufferMutex.processorPause(loop_counter++);
-				continue;
 			}
 
-			printf("reading data...\n");
-            do
+            //needs initial read to avoid skipping the last item
+            lockGuard g(bufferMutex);
+            result.push_back( buffer[readIndex] );
+
+            //reads data until the buffer is empty
+            while ( !bufferIsEmpty() )
             {
-                lockGuard g(bufferMutex);
+                readIndex = (readIndex + 1) % buffSize;
+                result.push_back( buffer[readIndex] );	
+            }
 
-                //Add data to vector and update readIndex
-                result.push_back( buffer[readIndex] );
-				readIndex = (readIndex + 1) % buffSize;	
-
-                printf("!bufferIsEmpty() = %d  |  !atEndOfTrace() = %d\n", !bufferIsEmpty(), !atEndOfTrace());
-            } while ( !bufferIsEmpty() && !atEndOfTrace() );
-
-            printf("The end of read(vector) has been reached...*dramatic music*\n");
-            //Mark the end last section being read
-            //result.push_back(-7777);
             return true;
 		}
 	}
@@ -90,8 +94,14 @@ public:
 		return false;
 	}
 
-	//modify so write() takes a CONST
-    //Takes a queue, and empties it while transferring to buffer
+
+    /**
+     * @brief      Writes a queue of data to the buffer
+     *
+     * @param      src   The queue that contains the data
+     *
+     * @return     An int containing the number of items written
+     */
     int write(std::queue<T> &src)
 	{
         int loop_counter = 0;
@@ -99,52 +109,44 @@ public:
 	
 		while( true ) 
 		{
-            printf("writeIndex = %zu [write]\n", writeIndex);
-            printf("readIndex = %zu [write]\n", readIndex);
 
-            if ( bufferIsFull() )
+            //wait until read is complete
+            while ( !bufferIsEmpty() )
 			{
                 lockGuard g(bufferMutex);
-
-                //printf("Inside [w]check #2\n");
                 bufferMutex.processorPause(loop_counter++);
-				return 0;
 			}
 			
-            printf("Items in queue = %lu [myCircularBuffer - write()]\n", src.size());
-            //printf("buffSize = %zu [myCircularBuffer]\n", buffSize);
-			printf("writing data...\n");
+            //needs initial write to avoid skipping the last item
+            lockGuard g(bufferMutex);
+            buffer[writeIndex] = src.front();
+            src.pop();
+            item_count++;
+
+            //write until the buffer is full
             while ( !bufferIsFull() )
             {
-                lockGuard g(bufferMutex);
+                //increment first to avoid skipping last item
+                writeIndex = (writeIndex + 1) % (buffSize);
 
+                //if src is empty before buffer is full indicates last write
                 if ( src.empty() )
                 {
-                    printf("src is EMPTY [myCircularBuffer]\n");
+                    //set and mark last write so read knows when to stop
+                    atEndOfTrace = true;
                     buffer[writeIndex] = END_OF_TRACE;
                     item_count++;
 
-                    writeIndex = (writeIndex + 1) % (buffSize+1);
                     __sync_synchronize();
                     return item_count;
                 }
 
-                //printf("!src.empty = %d\n", !src.empty());
+                //normal write
                 buffer[writeIndex] = src.front();
                 src.pop();
                 item_count++;
-
-                printf("[%zu] src.size = %zu [write]\n", writeIndex, src.size());
-                /*MARK if at end of trace, so read() knows when to stop*/
-
-				writeIndex = (writeIndex + 1) % (buffSize+1);
-                //__sync_synchronize();
 			}
-			
-            printf("writeIndex = %zu [write]\n", writeIndex);
-            printf("readIndex = %zu [write]\n", readIndex);
-            printf("buffSize+1 = %zu [myCircularBuffer]\n", (buffSize+1));
-            printf("DONE WRITING! Items written = %d [myCircularBuffer]\n", item_count);
+
             __sync_synchronize();
             return item_count;
 		}
@@ -173,16 +175,7 @@ public:
 
     bool bufferIsFull()
     {
-        if ( ((writeIndex + 1) % (buffSize+1) == readIndex) )
-        {
-            return true;
-        }
-        return false;
-    }
-
-    bool atEndOfTrace()
-    {
-        if (buffer[readIndex] == END_OF_TRACE)
+        if ( ((writeIndex + 1) % (buffSize) == readIndex) )
         {
             return true;
         }

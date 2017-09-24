@@ -22,17 +22,16 @@ int findFileLength();
 //simulates the pintool
 int main (int argc, char** argv)
 {
-	//-------------------
-	//Init queue
-	//-------------------
+	/*
+	 * Init queue with trace data
+	 */
     std::queue<trace_entry_t> fileData;
     std::queue<trace_entry_t> toWrite;
     traceFileToQueue(fileData, findFileLength());
-    size_t const traceLength = fileData.size();
-    size_t const iterations = traceLength / WORKSPACE_LEN;
+    size_t const iterations = fileData.size() / WORKSPACE_LEN;
 
     PinTunnel traceTunnel;
-    size_t buffer = 0;
+    size_t bufferIndex = 0;
 
     //Write to tunnel
     for (int i = 0; i < iterations; i++)
@@ -44,20 +43,11 @@ int main (int argc, char** argv)
             fileData.pop();
         }
 
-        printf("\n-->[%d] ", i);
-        printf("queue to add length = %lu [mmapWriteTunnel - main]\n", toWrite.size());
-        traceTunnel.writeTraceSegment(buffer, toWrite);
-        //traceTunnel.clearBuffer(buffer);
+        traceTunnel.writeTraceSegment(bufferIndex, toWrite);
     }
 
     //final write segment
-    printf("\nFinal writeTraceSegment.size() = %lu\n", fileData.size());
-    traceTunnel.writeTraceSegment(buffer, fileData);
-    //traceTunnel.clearBuffer(buffer);
-
-    printf("\nWORKSPACE_LEN = %d\n", WORKSPACE_LEN);
-    printf("iterations = %zu\n", iterations);
-    printf("q length = %lu ...should be empty\n", fileData.size());
+    traceTunnel.writeTraceSegment(bufferIndex, fileData);
 
 
 	return 0;
