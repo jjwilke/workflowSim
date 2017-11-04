@@ -64,6 +64,10 @@ TARGET=$(PROG_ROOT)/bin/$(PINTOOL_NAME).dylib
 
 all : $(TARGET)
 
+#debug: CXXFLAGS += -DDEBUG -g
+#debug: CPPFLAGS += -DDEBUG -g
+#debug: $(TARGET)
+
 SOURCE=$(PROG_ROOT)/pintools/$(PINTOOL_NAME).cpp
 OBJECT=$(SOURCE:.cpp=.o)
 
