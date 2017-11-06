@@ -42,9 +42,9 @@ void directSimResults(unsigned int);
 int main (int argc, char** argv)
 {
 
-	//VARIABLES
+	// CALL VARIABLES
 	// To modify
-	std::string home = "/Users/Garrett"; //would use $HOME, but execve does not read
+	std::string home = "/Users/gvanmou"; //would use $HOME, but execve does not read
     std::string pinCall = home + "/install/pin-3.2-81205-clang-mac/pin";
     std::string pintool = "traceTool.dylib";
     std::string progToTrace = "forkTest";
@@ -95,13 +95,15 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
 	int status;
 	int timeout;
 
-    //Make sure initial tunnel exists
+    // Parent traceTunnel
+    // NUM_OF_BUFFERS and WORKSPACE_LEN set in macros.h
     PinTunnel traceTunnel(NUM_OF_BUFFERS, WORKSPACE_LEN, 1);
-    printf("PinTunnel Created!!!\n");
+    printf("Parent PinTunnel Created {mmapPinSim.cpp}\n");
     printf("NUM_OF_BUFFERS = %d\n", NUM_OF_BUFFERS);
+    // printf("%lu\n", sizeof(trace_entry_t) );
+
     printf("WORKSPACE_LEN = %d\n", WORKSPACE_LEN);
-    size_t buffer = 0;
-    printf("traceTunnel buffer size [parent] (size != 0) = %zu\n", traceTunnel.getTunnelBufferLen(buffer) );
+    // printf("traceTunnel buffer size [parent] (size != 0) = %zu\n", traceTunnel.getTunnelBufferLen(buffer) );
 
 	pid = fork();
 	if (pid < 0)
@@ -118,6 +120,7 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
 		if ( execve(argv[0], (char **)argv, nullptr) )
 		{
 			perror("Error: Program failed to execute");
+            printf("Check path in 'home' variable {main()}\n");
 			return false;
 		}
 
@@ -146,30 +149,30 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
 bool readInTrace(PinTunnel &tunnel, size_t &bufferIndex, std::vector<trace_entry_t> &result)
 {
     //need a temp, as readTraceSegment() clears the passed vector
-    std::vector<trace_entry_t> temp;
+    std::vector<trace_entry_t> readInData;
     int index = 0;
 	
 	while ( true )
 	{
-        //Wait until there is something in the cir_buf_t to read
-		printf("waiting to read...\n");
+        // Wait until there is something in the cir_buf_t to read
+		printf("waiting to read... {parent->readInTrace()}\n");
 
-        //Collect trace segment, with size according to WORKSPACE_SIZE in macro.h
-        tunnel.readTraceSegment(bufferIndex, temp);
-
-        //Clear trace buffer
+        // Collect trace segment, with size according to WORKSPACE_SIZE in macro.h
+        // No need to clear readInData before passing it, as it is cleared in read()
+        tunnel.readTraceSegment(bufferIndex, readInData);
+        // Clear trace buffer
         tunnel.clearBuffer(bufferIndex);
 		
-		printf("Adding vector to result of %lu elements\n", temp.size());
+		printf("Adding vector to result of %lu elements {parent->readInTrace()}\n", readInData.size());
 
-		//Add temp to result vector
-		for (int i = 0; i < temp.size(); i++)
+		//Add readInData to result vector
+		for (int i = 0; i < readInData.size(); i++)
 		{
-			if ( temp[i] == END_OF_TRACE )
+			if ( readInData[i] == END_OF_TRACE )
 			{
 				return true;
 			}
-			result[index] = temp[i];
+			result[index] = readInData[i];
 			index++;
 		}
 	}
