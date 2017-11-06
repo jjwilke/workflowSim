@@ -200,6 +200,7 @@ public:
         td = (TunnelData*)shmPtr;
         shmSize = td->shmSegSize;
         printf("shmSize2 [getShmSegSize() 2nd] = %zu\n", shmSize);
+        printf("Hello!!!!!!!!!!!\n");
         if ( munmap(shmPtr, sizeof(TunnelData)) == -1 )
         {
             printf("MUNMAP 0 failed\n");
@@ -221,7 +222,6 @@ public:
         td = (TunnelData*)shmPtr;
         //sharedData = (SharedDataType*)((uint8_t*)shmPtr + td->offsets[0]);
 
-        // PROBLEM HERE!!
         for ( size_t c = 0 ; c < td->numBuffers ; c++ ) 
         {
             printf("td->offsets[c] [PinTunnel() 2nd] = %zu\n", td->offsets[c]);
@@ -243,7 +243,7 @@ public:
      */
     virtual ~PinTunnel()
     {
-        //printf("PinTunnel Destructor...\n");
+        printf("PinTunnel Destructor...\n");
         shutdown(true);
     }
 

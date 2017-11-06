@@ -17,6 +17,10 @@ OBJECT = $(SOURCE: .cpp=.o)
 
 all : $(TARGET)
 
+debug: CXXFLAGS += -DDEBUG -g
+debug: CPPFLAGS += -DDEBUG -g
+debug: $(TARGET) 
+
 %.o : %.cpp
 	$(CC) $(INCLUDES) $(CFLAGS) -c -o $@ $<
 

@@ -20,7 +20,7 @@ unsigned int MISS_COUNT;
 
 //Pin call
 bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data);
-bool pinCallFini(pid_t &pid, int &status, int &timeout, int argc, const char **argv);
+bool pinCallComplete(pid_t &pid, int &status, int &timeout, int argc, const char **argv);
 
 //Input data
 void printVector(std::vector<intptr_t> &src);
@@ -49,10 +49,12 @@ int main (int argc, char** argv)
     std::string pintool = "traceTool.dylib";
     std::string progToTrace = "forkTest";
 
-    //std::string lldb = "lldb";
+    // ADD debugging. Does not work properly.
+    // std::string debug1 = "-appdebug";
+    // std::string debug2 = "-appdebug_lldb_options";
 	std::string pinOptions = "-t";
-	std::string pintoolCall = "bin/" + pintool;
-    std::string progCall = "bin/" + progToTrace;
+	std::string pintoolCall = "bin/traceTool.dylib";
+    std::string progCall = "bin/forkTest";
 
 	// Pin call
     int my_argc = 5;
@@ -126,14 +128,14 @@ bool exeProg(int argc, const char **argv, std::vector<trace_entry_t> &data)
 	//-----------------------
 
     //Collect Trace
-    //size_t bufferIndex = 0;
-    //readInTrace(traceTunnel, bufferIndex, data);
+    size_t bufferIndex = 0;
+    readInTrace(traceTunnel, bufferIndex, data);
 
     //TEST
     //printVector(data);
 	
 	//Wait for child and summarize fork call
-	return pinCallFini(pid, status, timeout, argc, argv);	
+	return pinCallComplete(pid, status, timeout, argc, argv);	
 		
 }
 
@@ -182,7 +184,7 @@ void printVector(std::vector<intptr_t> &src)
     }
 }
 
-bool pinCallFini(pid_t &pid, int &status, int &timeout, int argc, const char **argv)
+bool pinCallComplete(pid_t &pid, int &status, int &timeout, int argc, const char **argv)
 {
     timeout = 1000;
     while (0 == waitpid(pid, &status, WNOHANG))

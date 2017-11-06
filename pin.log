@@ -1,2 +1,6 @@
 Pin 3.2 kit 81201
-E:  Unable to load /Users/Garrett/Desktop/workflowProject/bin/traceTool.dylib
+E:  Unable to run task_for_pid() on the process to be injected.
+This was probably happened because this host machine was not configured correctly to run Pin.
+Please run:
+sudo <PIN_KIT>/sbin/host_config
+To fix this problem

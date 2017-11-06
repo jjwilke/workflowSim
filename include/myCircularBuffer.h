@@ -40,13 +40,15 @@ public:
      */
     bool read(std::vector<T> &result) 
 	{
+        printf("in read()... {myCircularBuffer}\n");
+
         int loop_counter = 0;
         //Make sure the collection vector is empty
 		result.clear();
 
 		while( true ) 
         {
-            //wait until the buffer is full, or at the last read
+            //wait until the buffer is full
             while ( !bufferIsFull() )
 			{
                 //if at the last read, the buffer will never be full
@@ -106,10 +108,13 @@ public:
 	{
         int loop_counter = 0;
         int item_count = 0;
+
+        printf("in write()... {myCircularBuffer}\n");
 	
 		while( true ) 
 		{
 
+            printf("waiting for buffer to be empty... {myCircularBuffer}\n");
             //wait until read is complete
             while ( !bufferIsEmpty() )
 			{
@@ -123,6 +128,7 @@ public:
             src.pop();
             item_count++;
 
+            printf("writing... {myCircularBuffer}\n");
             //write until the buffer is full
             while ( !bufferIsFull() )
             {
