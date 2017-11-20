@@ -107,6 +107,8 @@ public:
      */
     PinTunnel(size_t numBuffers, size_t bufferLength, uint32_t expectedChildren = 1) : master(true), shmPtr(NULL), fd(-1)
     {
+        printf("\nCreating PinTunnel (parameterized constructor to initiate a tunnel)...\n\n");
+
         filename = MMAP_PATH;
         fd = open(filename, O_RDWR|O_CREAT, 0660);
         if ( fd < 0 ) {
@@ -116,7 +118,6 @@ public:
         }
 
         shmSize = calculateShmemSize(numBuffers, bufferLength);
-        printf("shmSize1 [PinTunnel() 1st] = %zu\n", shmSize);
         if ( ftruncate(fd, shmSize) ) {
             // Not using Output because IPC means Output might not be available
             fprintf(stderr, "Resizing shared file '%s' failed: %s\n", filename, strerror(errno));
@@ -129,7 +130,6 @@ public:
             fprintf(stderr, "mmap failed: %s\n", strerror(errno));
             exit(1);
         }
-        printf("    -->MMAP address [PARENT] = %p\n", (void*)&shmPtr);
         nextAllocPtr = (uint8_t*)shmPtr;
         memset(shmPtr, '\0', shmSize);
 
@@ -155,8 +155,6 @@ public:
             auto resResult = reserveSpace<cir_buf_t>(cbSize);
             td->offsets[c] = resResult.first;
 
-            printf("td->offsets[c] [PinTunnel() 1st] = %zu\n", td->offsets[c]);
-
             cPtr = resResult.second;
             cPtr->setBufferLength(bufferLength);
             circBuffs.push_back(cPtr);
@@ -170,7 +168,7 @@ public:
      */
     PinTunnel() : master(false), shmPtr(NULL), fd(-1)
     {
-        printf("\nIN PinTunnel()_____\n");
+        printf("\nCreating PinTunnel (default constructor for existing tunnel)...\n\n");
 
         filename = MMAP_PATH;
         fd = open(filename, O_RDWR, 0660);
@@ -199,8 +197,6 @@ public:
 
         td = (TunnelData*)shmPtr;
         shmSize = td->shmSegSize;
-        printf("shmSize2 [getShmSegSize() 2nd] = %zu\n", shmSize);
-        printf("Hello!!!!!!!!!!!\n");
         if ( munmap(shmPtr, sizeof(TunnelData)) == -1 )
         {
             printf("MUNMAP 0 failed\n");
@@ -218,13 +214,11 @@ public:
             printf("MMAP 1 failed: %s\n", strerror(errno));
             exit(1);
         }
-        printf("    -->MMAP address [PIN] = %p\n", (void*)&shmPtr);
         td = (TunnelData*)shmPtr;
         //sharedData = (SharedDataType*)((uint8_t*)shmPtr + td->offsets[0]);
 
         for ( size_t c = 0 ; c < td->numBuffers ; c++ ) 
         {
-            printf("td->offsets[c] [PinTunnel() 2nd] = %zu\n", td->offsets[c]);
             cir_buf_t *toAdd = (cir_buf_t*)( (uint8_t*)shmPtr + td->offsets[c] );
 
             circBuffs.push_back( toAdd );
@@ -233,7 +227,7 @@ public:
         /* Clean up if we're the last to attach */
         if ( --td->expectedChildren == 0 ) 
         {
-            printf("Closing file...\n");
+            // printf("Closing file...\n");
             close(fd);
         }
     }
@@ -243,7 +237,7 @@ public:
      */
     virtual ~PinTunnel()
     {
-        printf("PinTunnel Destructor...\n");
+        // printf("PinTunnel Destructor...\n");
         shutdown(true);
     }
 

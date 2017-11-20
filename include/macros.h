@@ -9,13 +9,13 @@ using cir_buf_t = CircularBuffer<trace_entry_t>;
 
 // static const int END_OF_TRACE = -7777;
 constexpr int const NUM_OF_BUFFERS = 1;
-constexpr int const WORKSPACE_SIZE = 7186;
+constexpr int const WORKSPACE_SIZE = 1024;
 constexpr int const TRACE_ENTRY_SIZE = sizeof(trace_entry_t);
 constexpr int const WORKSPACE_LEN = (WORKSPACE_SIZE / TRACE_ENTRY_SIZE);
 constexpr int const CIR_BUF_SIZE = sizeof(cir_buf_t);
 
 #ifndef MMAP_PATH
-    #define MMAP_PATH (const char*)"/Users/Garrett/Desktop/workflowProject/bin/pinMap.out"
+    #define MMAP_PATH (const char*) "/Users/gvanmou/Desktop/workflowProject/bin/pinMap.out"
 #endif
 
 

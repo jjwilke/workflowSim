@@ -40,7 +40,7 @@ public:
      */
     bool read(std::vector<T> &result) 
 	{
-        printf("in read()... {myCircularBuffer}\n");
+        // printf("in read()... {myCircularBuffer}\n");
 
         int loop_counter = 0;
         //Make sure the collection vector is empty
@@ -48,6 +48,7 @@ public:
 
 		while( true ) 
         {
+            // printf("waiting to read... {myCircularBuffer}\n");   
             //wait until the buffer is full
             while ( !bufferIsFull() )
 			{
@@ -66,6 +67,7 @@ public:
             lockGuard g(bufferMutex);
             result.push_back( buffer[readIndex] );
 
+            // printf("_________ READING DATA... {myCircularBuffer}\n");
             //reads data until the buffer is empty
             while ( !bufferIsEmpty() )
             {
@@ -109,12 +111,12 @@ public:
         int loop_counter = 0;
         int item_count = 0;
 
-        printf("in write()... {myCircularBuffer}\n");
+        // printf("in write()... {myCircularBuffer}\n");
 	
 		while( true ) 
 		{
 
-            printf("waiting for buffer to be empty... {myCircularBuffer}\n");
+            // printf("waiting for buffer to be empty... {myCircularBuffer}\n");
             //wait until read is complete
             while ( !bufferIsEmpty() )
 			{
@@ -128,7 +130,7 @@ public:
             src.pop();
             item_count++;
 
-            printf("writing... {myCircularBuffer}\n");
+            // printf("_________ WRITING DATA... {myCircularBuffer}\n");
             //write until the buffer is full
             while ( !bufferIsFull() )
             {

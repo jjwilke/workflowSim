@@ -5,7 +5,8 @@ CC := g++
 
 INCLUDES := \
 	-I$(PROG_ROOT)/include
-CXXFLAGS := 
+CXXFLAGS := -fsanitize=address \
+			-O0 -g
 CPPFLAGS :=
 CFLAGS :=
 LDFLAGS := -std=c++11
@@ -25,7 +26,7 @@ debug: $(TARGET)
 	$(CC) $(INCLUDES) $(CFLAGS) -c -o $@ $<
 
 $(TARGET) : $(OBJECT)
-	$(CC) -o $@ $+ $(INCLUDES) $(LDFLAGS) $(LIBS)
+	$(CC) -o $@ $+ $(INCLUDES) $(CXXFLAGS) $(LDFLAGS) $(LIBS)
 
 clean : $(OBJECT)
 	rm -f *.o $(TARGET)
