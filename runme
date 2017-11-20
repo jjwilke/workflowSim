@@ -1,0 +1,9 @@
+#! /usr/bin/env bash
+
+CXXFLAGS="-std=c++11" \
+CXX=g++ \
+CC=gcc \
+cmake --debug-trycompile .. \
+  -DSST_CORE=$HOME/Programs/install/sst-core/clang \
+  -DPIN_ROOT=$HOME/Programs/pin-3.2-81205-clang-mac
+
